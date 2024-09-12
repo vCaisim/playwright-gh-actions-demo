@@ -1,0 +1,167 @@
+name: demo.playwright.failed-only
+
+on:
+  workflow_dispatch:
+    inputs:
+      lastFailed:
+        type: choice
+        required: true
+        options:
+          - "onretry"
+          - "yes"
+          - "no"
+        default: "onretry"
+        description: Run just the last failed tests instead of the full suite. Defaults to "onretry".
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-shards:
+    strategy:
+      matrix:
+        shard: [1, 2, 3]
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:latest
+
+    steps:
+      - name: Inputs
+        env:
+          INPUTS: ${{ toJson(inputs) }}
+        run: echo "$INPUTS"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: |
+          echo "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18.x"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chrome
+
+      - name: Cache last run results for shard ${{ matrix.shard }}
+        if: ${{ always() }}
+        uses: actions/cache@v3
+        with:
+          path: basic/test-results/.last-run.json
+          key: ${{ runner.os }}-test-results-${{ github.run_id }}-${{ matrix.shard }}
+
+      - name: Populate the .last-run.json with results from Currents API
+        if: ${{ github.run_attempt == 1 && inputs.lastFailed == 'yes' }}
+        continue-on-error: true
+        env:
+          CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
+          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
+        run: |
+          # npx currents get-run --failed --project=example --tags=sdfsd,sdfsd --branch=$GITHUB_REF --ci-build-id=$CURRENTS_CI_BUILD_ID --provider="pw" > basic/test-results/.last-run.json
+
+      - name: Set Test Options
+        id: set-options
+        if: ${{ always() }}
+        run: |
+          # Initialize variables
+          SHARD_OPTION=""
+          EXTRA_ARGS=""
+
+          if [ ${{ github.run_attempt }} -gt 1 ] || [ "${{ inputs.lastFailed }}" = "onretry" ] && [ -f basic/test-results/.last-run.json ]; then
+            SHARD_OPTION="--shard=1/1"
+            EXTRA_ARGS="--last-failed"
+          elif [ "${{ inputs.lastFailed }}" = "yes" ] && [ -f basic/test-results/.last-run.json ]; then
+            SHARD_OPTION="--shard=${{ matrix.shard }}/${{ strategy.job-total }}"
+            EXTRA_ARGS="--last-failed"
+          else
+            SHARD_OPTION="--shard=${{ matrix.shard }}/${{ strategy.job-total }}"
+          fi
+
+          echo "SHARD_OPTION=${SHARD_OPTION}" >> $GITHUB_OUTPUT
+          echo "EXTRA_ARGS=${EXTRA_ARGS}" >> $GITHUB_OUTPUT
+
+      - name: Run Tests
+        working-directory: ./basic
+        env:
+          CURRENTS_PROJECT_ID: bnsqNa
+          CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          SHARD_OPTION=${{ steps.set-options.outputs.SHARD_OPTION }}
+          EXTRA_ARGS=${{ steps.set-options.outputs.EXTRA_ARGS }}
+
+          COMMAND="npx pwc ${SHARD_OPTION} ${EXTRA_ARGS}"
+          echo "Running command: $COMMAND"
+          eval $COMMAND
+
+  test-or8n:
+    strategy:
+      matrix:
+        shard: [1, 2, 3]
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:latest
+
+    steps:
+      - name: GitHub Event
+        env:
+          GITHUB_EVENT_CONTEXT: ${{ toJson(github.event) }}
+        run: echo "$GITHUB_EVENT_CONTEXT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: |
+          echo "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18.x"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chrome
+
+      - name: Populate the .last-run.json with results from Currents API
+        continue-on-error: true
+        env:
+          CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
+          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
+        run: |
+          # npx currents get-run --failed --project=example --tags=sdfsd,sdfsd --branch=$GITHUB_REF --ci-build-id=$CURRENTS_CI_BUILD_ID --provider="pw" > basic/test-results/.last-run.json
+
+      - name: Set Test Options
+        id: set-options
+        if: ${{ always() }}
+        run: |
+          # Initialize variables
+          EXTRA_ARGS=""
+
+          if [ ${{ github.run_attempt }} -gt 1 ] || [ "${{ inputs.lastFailed }}" = "onretry" ] || [ "${{ inputs.lastFailed }}" = "yes" ] && [ -f basic/test-results/.last-run.json ]; then
+            EXTRA_ARGS="--last-failed"
+          fi
+
+          echo "EXTRA_ARGS=${EXTRA_ARGS}" >> $GITHUB_OUTPUT
+
+      - name: Run Tests
+        working-directory: ./basic
+        env:
+          CURRENTS_PROJECT_ID: bnsqNa
+          CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          EXTRA_ARGS=${{ steps.set-options.outputs.EXTRA_ARGS }}
+
+          COMMAND="npx pwc-p ${EXTRA_ARGS}"
+          echo "Running command: $COMMAND"
+          eval $COMMAND
