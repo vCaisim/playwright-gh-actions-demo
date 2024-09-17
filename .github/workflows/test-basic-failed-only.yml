@@ -48,6 +48,7 @@ jobs:
         run: |
           npm ci
           npx playwright install chrome
+          npm install -g @currents/cmd@beta
 
       - name: Cache last run results for shard ${{ matrix.shard }}
         if: ${{ always() }}
@@ -61,7 +62,7 @@ jobs:
         continue-on-error: true
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
-          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
+          CURRENTS_CI_BUILD_ID: shards-${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
           CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
           npx currents get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
@@ -92,7 +93,7 @@ jobs:
         env:
           CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
           CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+          CURRENTS_CI_BUILD_ID: shards-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
           CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
         run: |
           SHARD_OPTION=${{ steps.set-options.outputs.SHARD_OPTION }}
@@ -133,12 +134,13 @@ jobs:
         run: |
           npm ci
           npx playwright install chrome
+          npm install -g @currents/cmd@beta
 
       - name: Populate the .last-run.json with results from Currents API
         continue-on-error: true
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
-          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
+          CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
           CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
           npx currents get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
@@ -161,7 +163,7 @@ jobs:
         env:
           CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
           CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+          CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
           CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
         run: |
           EXTRA_ARGS=${{ steps.set-options.outputs.EXTRA_ARGS }}
