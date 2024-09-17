@@ -62,8 +62,9 @@ jobs:
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
           CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
+          CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
-          # npx currents get-run --failed --project=example --tags=sdfsd,sdfsd --branch=$GITHUB_REF --ci-build-id=$CURRENTS_CI_BUILD_ID --provider="pw" > basic/test-results/.last-run.json
+          npx currents get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
 
       - name: Set Test Options
         id: set-options
@@ -89,9 +90,10 @@ jobs:
       - name: Run Tests
         working-directory: ./basic
         env:
-          CURRENTS_PROJECT_ID: bnsqNa
+          CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
           CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
           CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+          CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
         run: |
           SHARD_OPTION=${{ steps.set-options.outputs.SHARD_OPTION }}
           EXTRA_ARGS=${{ steps.set-options.outputs.EXTRA_ARGS }}
@@ -137,8 +139,9 @@ jobs:
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
           CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
+          CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
-          # npx currents get-run --failed --project=example --tags=sdfsd,sdfsd --branch=$GITHUB_REF --ci-build-id=$CURRENTS_CI_BUILD_ID --provider="pw" > basic/test-results/.last-run.json
+          npx currents get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
 
       - name: Set Test Options
         id: set-options
@@ -156,9 +159,10 @@ jobs:
       - name: Run Tests
         working-directory: ./basic
         env:
-          CURRENTS_PROJECT_ID: bnsqNa
+          CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
           CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
           CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+          CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
         run: |
           EXTRA_ARGS=${{ steps.set-options.outputs.EXTRA_ARGS }}
 
