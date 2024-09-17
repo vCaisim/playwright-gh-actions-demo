@@ -65,7 +65,7 @@ jobs:
           CURRENTS_CI_BUILD_ID: shards-${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
           CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
-          npx currents get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
+          npx currents api get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
 
       - name: Set Test Options
         id: set-options
@@ -143,7 +143,7 @@ jobs:
           CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
           CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
-          npx currents get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
+          npx currents api get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
 
       - name: Set Test Options
         id: set-options
