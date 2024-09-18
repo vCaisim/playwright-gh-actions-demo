@@ -50,45 +50,52 @@ jobs:
           npx playwright install chrome
           npm install -g @currents/cmd@beta
 
-      - name: Cache last run results for shard ${{ matrix.shard }}
-        if: ${{ always() }}
-        uses: actions/cache@v3
+      - name: Download last run results for shard ${{ matrix.shard }}
+        if: ${{ github.run_attempt > 1 }}
+        uses: actions/download-artifact@v4
         with:
-          path: basic/test-results/.last-run.json
-          key: ${{ runner.os }}-test-results-${{ github.run_id }}-${{ matrix.shard }}
+          name: last-run-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: basic/test-results
 
-      - name: Populate the .last-run.json with results from Currents API
-        if: ${{ github.run_attempt == 1 && inputs.lastFailed == 'yes' }}
+      - name: Display structure of downloaded files
+        continue-on-error: true
+        run: ls -R basic/test-results
+
+      - name: Resolve Playwright options
+        id: set-options
         continue-on-error: true
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
-          CURRENTS_CI_BUILD_ID: shards-${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
           CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
-          npx currents api get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
+          PROJECT_ID=${{ secrets.CURRENTS_PROJECT_ID }}
+          BRANCH=""
+          PW_SHARDING="${{ matrix.shard }}/${{ strategy.job-total }}"
+          EXTRA_PW_FLAGS=""
 
-      - name: Set Test Options
-        id: set-options
-        if: ${{ always() }}
-        run: |
-          # Initialize variables
-          SHARD_OPTION=""
-          EXTRA_ARGS=""
-
-          if [ ${{ github.run_attempt }} -gt 1 ] || [ "${{ inputs.lastFailed }}" = "onretry" ] && [ -f basic/test-results/.last-run.json ]; then
-            SHARD_OPTION="--shard=1/1"
-            EXTRA_ARGS="--last-failed"
-          elif [ "${{ inputs.lastFailed }}" = "yes" ] && [ -f basic/test-results/.last-run.json ]; then
-            SHARD_OPTION="--shard=${{ matrix.shard }}/${{ strategy.job-total }}"
-            EXTRA_ARGS="--last-failed"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH=${{ github.head_ref }}
           else
-            SHARD_OPTION="--shard=${{ matrix.shard }}/${{ strategy.job-total }}"
+            BRANCH=${{ github.ref_name }}
+          fi
+          echo "Branch name: $BRANCH"
+
+          if [ "${{ inputs.lastFailed }}" = "yes" ] || ([ "${{ inputs.lastFailed }}" = "onretry" ] && [ ${{ github.run_attempt }} -gt 1 ]); then
+            if [ ${{ github.run_attempt }} -gt 1 ]; then
+              PW_SHARDING="1/1"
+              EXTRA_PW_FLAGS="--last-failed"
+            elif npx currents api get-run --project-id=$PROJECT_ID  --branch=$BRANCH --pw-last-failed --output=basic/test-results/.last-run.json; then
+              echo "basic/test-results/.last-run.json contents"
+              cat basic/test-results/.last-run.json
+              EXTRA_PW_FLAGS="--last-failed"
+            fi
           fi
 
-          echo "SHARD_OPTION=${SHARD_OPTION}" >> $GITHUB_OUTPUT
-          echo "EXTRA_ARGS=${EXTRA_ARGS}" >> $GITHUB_OUTPUT
+          echo "PW_SHARDING=${PW_SHARDING}" >> $GITHUB_OUTPUT
+          echo "EXTRA_PW_FLAGS=${EXTRA_PW_FLAGS}" >> $GITHUB_OUTPUT
 
       - name: Run Tests
+        continue-on-error: true
         working-directory: ./basic
         env:
           CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
@@ -96,12 +103,20 @@ jobs:
           CURRENTS_CI_BUILD_ID: shards-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
           CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
         run: |
-          SHARD_OPTION=${{ steps.set-options.outputs.SHARD_OPTION }}
-          EXTRA_ARGS=${{ steps.set-options.outputs.EXTRA_ARGS }}
+          PW_SHARDING=${{ steps.set-options.outputs.PW_SHARDING }}
+          EXTRA_PW_FLAGS=${{ steps.set-options.outputs.EXTRA_PW_FLAGS }}
 
-          COMMAND="npx pwc ${SHARD_OPTION} ${EXTRA_ARGS}"
+          COMMAND="npx pwc $EXTRA_PW_FLAGS --shard=$PW_SHARDING"
           echo "Running command: $COMMAND"
           eval $COMMAND
+
+      - name: Upload last run results for shard ${{ matrix.shard }}
+        if: ${{ github.run_attempt == 1 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-run-${{ github.run_id }}-shard-${{ matrix.shard }}
+          include-hidden-files: true
+          path: basic/test-results/.last-run.json
 
   test-or8n:
     strategy:
@@ -136,27 +151,39 @@ jobs:
           npx playwright install chrome
           npm install -g @currents/cmd@beta
 
-      - name: Populate the .last-run.json with results from Currents API
+      - name: Resolve Playwright options
+        id: set-options
         continue-on-error: true
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
-          CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-1 # Always 1 for the first run
           CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
         run: |
-          npx currents api get-run --ci-build-id=$CURRENTS_CI_BUILD_ID --pw-last-failed --output basic/test-results/.last-run.json
+          PREVIOUS_CI_BUILD_ID=or8n-${{ github.repository }}-${{ github.run_id }}-1
+          PROJECT_ID=${{ secrets.CURRENTS_PROJECT_ID }}
+          BRANCH=""
+          EXTRA_PW_FLAGS=""
+          EXTRA_CURRENTS_CLI_FLAGS=""
 
-      - name: Set Test Options
-        id: set-options
-        if: ${{ always() }}
-        run: |
-          # Initialize variables
-          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH=${{ github.head_ref }}
+          else
+            BRANCH=${{ github.ref_name }}
+          fi
+          echo "Branch name: $BRANCH"
 
-          if [ ${{ github.run_attempt }} -gt 1 ] || [ "${{ inputs.lastFailed }}" = "onretry" ] || [ "${{ inputs.lastFailed }}" = "yes" ] && [ -f basic/test-results/.last-run.json ]; then
-            EXTRA_ARGS="--last-failed"
+          if [ "${{ inputs.lastFailed }}" = "yes" ] || ([ "${{ inputs.lastFailed }}" = "onretry" ] && [ ${{ github.run_attempt }} -gt 1 ]); then
+            if [ ${{ github.run_attempt }} -gt 1 ]; then
+              EXTRA_CURRENTS_CLI_FLAGS="--ci-build-id=$PREVIOUS_CI_BUILD_ID"
+            fi
+
+            if npx currents api get-run --project=$PROJECT_ID --branch=$BRANCH --pw-last-failed $EXTRA_CURRENTS_CLI_FLAGS --output=basic/test-results/.last-run.json; then
+              echo "basic/test-results/.last-run.json contents"
+              cat basic/test-results/.last-run.json
+              EXTRA_PW_FLAGS="--last-failed"
+            fi
           fi
 
-          echo "EXTRA_ARGS=${EXTRA_ARGS}" >> $GITHUB_OUTPUT
+          echo "EXTRA_PW_FLAGS=${EXTRA_PW_FLAGS}" >> $GITHUB_OUTPUT
 
       - name: Run Tests
         working-directory: ./basic
@@ -166,8 +193,8 @@ jobs:
           CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
           CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
         run: |
-          EXTRA_ARGS=${{ steps.set-options.outputs.EXTRA_ARGS }}
+          EXTRA_PW_FLAGS=${{ steps.set-options.outputs.EXTRA_PW_FLAGS }}
 
-          COMMAND="npx pwc-p ${EXTRA_ARGS}"
+          COMMAND="npx pwc-p ${EXTRA_PW_FLAGS}"
           echo "Running command: $COMMAND"
           eval $COMMAND
