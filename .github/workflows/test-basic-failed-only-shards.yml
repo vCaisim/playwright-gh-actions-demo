@@ -36,28 +36,24 @@ jobs:
           npx playwright install chrome
           npm install -g @currents/cmd@beta
 
-      - name: Prepare environment
-        working-directory: ./basic
+      - name: Prepare environment & load last run from cache for shard ${{ matrix.shard }}
         run: |
-          # if it is a retry (based on environment)
-          # downloads test-results/last-run.json for the current shard
-          # sets "EXTRA_PW_FLAGS=--last-failed --shard=1/1" to $GITHUB_ENV
-          # otherwise sets "EXTRA_PW_FLAGS=--shard=${{ matrix.shard }}/${{ strategy.job-total }}"
+          GH_STRATEGY_NODE_INDEX=$(( ${{ strategy.node-index }} + 1 ))
+          echo "GH_STRATEGY_NODE_INDEX=$GH_STRATEGY_NODE_INDEX" >> $GITHUB_ENV
+          echo "GH_STRATEGY_JOB_TOTAL=${{ strategy.job-total }}" >> $GITHUB_ENV
 
-          # npx currents cache get --preset last-failed-sharding
+          npx currents cache get --preset last-run --pw-output-dir basic/test-results --pw-config-dump .pw_config_dump
+          echo "EXTRA_PW_FLAGS=$(cat .pw_config_dump)" >> $GITHUB_ENV
 
       - name: Run Tests
         continue-on-error: true
         working-directory: ./basic
         run: |
-          COMMAND="npx pwc ${{ env.$EXTRA_PW_FLAGS }}"
+          COMMAND="npx pwc ${{ env.EXTRA_PW_FLAGS }}"
           echo "Running command: $COMMAND"
-          eval $COMMAND
+          $COMMAND
 
-      - name: Save last run results for shard ${{ matrix.shard }}
+      - name: Cache the last run results for shard ${{ matrix.shard }}
         if: ${{ always() }}
-        working-directory: ./basic
         run: |
-          # uploads test-results/.last-run.json for the current shard
-          # 
-          # npx currents cache set --preset last-failed-sharding
+          npx currents cache set --preset last-run --pw-output-dir basic/test-results
