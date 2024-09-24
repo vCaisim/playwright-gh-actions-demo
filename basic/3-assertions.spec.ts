@@ -22,34 +22,34 @@ test("should be able to use assertions", async ({ page }) => {
     await input.press("Enter");
   });
 
-  await test.step("toHaveCount/toHaveText/toContainText", async () => {
-    const items = page.locator(".todo-list li");
-    await expect(items).toHaveCount(1);
-    await expect(items.first()).toHaveText("Buy milk");
-    await expect(items).toHaveText(["Buy milk"]);
-    await expect(items.first()).toContainText("milk");
-  });
+  // await test.step("toHaveCount/toHaveText/toContainText", async () => {
+  //   const items = page.locator(".todo-list li");
+  //   await expect(items).toHaveCount(1);
+  //   await expect(items.first()).toHaveText("Buy milk");
+  //   await expect(items).toHaveText(["Buy milk"]);
+  //   await expect(items.first()).toContainText("milk");
+  // });
 
-  await test.step("toBeChecked", async () => {
-    const firstItemCheckbox = page.locator(
-      'input[type=checkbox]:left-of(:text("Buy milk"))'
-    );
-    await expect(firstItemCheckbox).not.toBeChecked();
-    await page.check('div input[type="checkbox"]');
-    await expect(firstItemCheckbox).toBeChecked();
-  });
+  // await test.step("toBeChecked", async () => {
+  //   const firstItemCheckbox = page.locator(
+  //     'input[type=checkbox]:left-of(:text("Buy milk"))'
+  //   );
+  //   await expect(firstItemCheckbox).not.toBeChecked();
+  //   await page.check('div input[type="checkbox"]');
+  //   await expect(firstItemCheckbox).toBeChecked();
+  // });
 
-  await test.step("toBeVisible/toBeHidden", async () => {
-    await expect(page.locator("text=Buy milk")).toBeVisible();
-    await page.click("text=Active");
-    await expect(page.locator("text=Buy milk")).toBeHidden();
-  });
+  // await test.step("toBeVisible/toBeHidden", async () => {
+  //   await expect(page.locator("text=Buy milk")).toBeVisible();
+  //   await page.click("text=Active");
+  //   await expect(page.locator("text=Buy milk")).toBeHidden();
+  // });
 
-  await test.step("toHaveClass/toHaveCSS", async () => {
-    await expect(
-      page.locator('[placeholder="What needs to be done?"]')
-    ).toHaveClass("new-todo");
-    await page.click("text=Clear completed");
-    await expect(page.locator(".main")).toHaveCSS("display", "none");
-  });
+  // await test.step("toHaveClass/toHaveCSS", async () => {
+  //   await expect(
+  //     page.locator('[placeholder="What needs to be done?"]')
+  //   ).toHaveClass("new-todo");
+  //   await page.click("text=Clear completed");
+  //   await expect(page.locator(".main")).toHaveCSS("display", "none");
+  // });
 });

@@ -6,6 +6,7 @@ on:
 jobs:
   test-shards:
     strategy:
+      fail-fast: false
       matrix:
         shard: [1, 2, 3]
     timeout-minutes: 60
@@ -37,16 +38,16 @@ jobs:
           npm install -g @currents/cmd@beta
 
       - name: Prepare environment & load last run from cache for shard ${{ matrix.shard }}
+        env:
+          DEBUG: "currents,currents:*"
         run: |
-          GH_STRATEGY_NODE_INDEX=$(( ${{ strategy.node-index }} + 1 ))
-          echo "GH_STRATEGY_NODE_INDEX=$GH_STRATEGY_NODE_INDEX" >> $GITHUB_ENV
+          echo "GH_STRATEGY_JOB_INDEX=${{ strategy.job-index }}" >> $GITHUB_ENV
           echo "GH_STRATEGY_JOB_TOTAL=${{ strategy.job-total }}" >> $GITHUB_ENV
 
           npx currents cache get --preset last-run --pw-output-dir basic/test-results --pw-config-dump .pw_config_dump
           echo "EXTRA_PW_FLAGS=$(cat .pw_config_dump)" >> $GITHUB_ENV
 
       - name: Run Tests
-        continue-on-error: true
         working-directory: ./basic
         run: |
           COMMAND="npx pwc ${{ env.EXTRA_PW_FLAGS }}"
@@ -54,6 +55,10 @@ jobs:
           $COMMAND
 
       - name: Cache the last run results for shard ${{ matrix.shard }}
+        env:
+          DEBUG: "currents,currents:*"
         if: ${{ always() }}
         run: |
+          echo "GH_STRATEGY_JOB_INDEX=${{ strategy.job-index }}" >> $GITHUB_ENV
+          echo "GH_STRATEGY_JOB_TOTAL=${{ strategy.job-total }}" >> $GITHUB_ENV
           npx currents cache set --preset last-run --pw-output-dir basic/test-results

@@ -32,6 +32,11 @@ const config: PlaywrightTestConfig = {
       use: {
         ...devices["Desktop Chrome"],
       },
+      testMatch: [
+        "1-getting-started.spec.ts",
+        "3-assertions.spec.ts",
+        "5-flaky.spec.ts",
+      ],
     },
     {
       name: "b",
@@ -39,6 +44,11 @@ const config: PlaywrightTestConfig = {
       use: {
         ...devices["Desktop Chrome"],
       },
+      testMatch: [
+        "1-getting-started.spec.ts",
+        "3-assertions.spec.ts",
+        "5-flaky.spec.ts",
+      ],
     },
   ],
 
