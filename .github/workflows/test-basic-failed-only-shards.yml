@@ -37,28 +37,28 @@ jobs:
           npx playwright install chrome
           npm install -g @currents/cmd@beta
 
-      - name: Prepare environment & load last run from cache for shard ${{ matrix.shard }}
-        env:
-          DEBUG: "currents,currents:*"
+      - name: Set strategy variables for shard ${{ matrix.shard }}
         run: |
           echo "GH_STRATEGY_JOB_INDEX=${{ strategy.job-index }}" >> $GITHUB_ENV
           echo "GH_STRATEGY_JOB_TOTAL=${{ strategy.job-total }}" >> $GITHUB_ENV
 
+      - name: Prepare environment & load last run from cache
+        env:
+          DEBUG: "currents,currents:*"
+        run: |
           npx currents cache get --preset last-run --pw-output-dir basic/test-results --pw-config-dump .pw_config_dump
           echo "EXTRA_PW_FLAGS=$(cat .pw_config_dump)" >> $GITHUB_ENV
 
       - name: Run Tests
         working-directory: ./basic
         run: |
-          COMMAND="npx pwc ${{ env.EXTRA_PW_FLAGS }}"
+          COMMAND="npx pwc $EXTRA_PW_FLAGS"
           echo "Running command: $COMMAND"
           $COMMAND
 
-      - name: Cache the last run results for shard ${{ matrix.shard }}
+      - name: Cache the last run results
         env:
           DEBUG: "currents,currents:*"
         if: ${{ always() }}
         run: |
-          echo "GH_STRATEGY_JOB_INDEX=${{ strategy.job-index }}" >> $GITHUB_ENV
-          echo "GH_STRATEGY_JOB_TOTAL=${{ strategy.job-total }}" >> $GITHUB_ENV
           npx currents cache set --preset last-run --pw-output-dir basic/test-results
