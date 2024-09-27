@@ -15,7 +15,7 @@ jobs:
     env:
       CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-      CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_CI_BUILD_ID: or8n-"or8n-${GITHUB_REPOSITORY}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
       CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
       CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
       CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
@@ -41,16 +41,12 @@ jobs:
 
       - name: Resolve Playwright options
         run: |
-          PREVIOUS_CI_BUILD_ID="or8n-${{ github.repository }}-${{ github.run_id }}-1"
+          PREVIOUS_CI_BUILD_ID="or8n-${GITHUB_REPOSITORY}-${GITHUB_RUN_ID}-$((GITHUB_RUN_ATTEMPT - 1))"
           EXTRA_PW_FLAGS=""
 
           if [ ${{ github.run_attempt }} -gt 1 ]; then
             if npx currents api get-run --pw-last-run --ci-build-id $PREVIOUS_CI_BUILD_ID --output basic/test-results/.last-run.json; then
-              echo "basic/test-results/.last-run.json contents"
-              cat basic/test-results/.last-run.json
               EXTRA_PW_FLAGS="--last-failed"
-            else
-              echo "Failed to retrieve last-run results, continuing without last-failed flag."
             fi
           fi
 
