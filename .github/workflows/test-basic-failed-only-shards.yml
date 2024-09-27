@@ -41,6 +41,7 @@ jobs:
         run: |
           echo "GH_STRATEGY_JOB_INDEX=${{ strategy.job-index }}" >> $GITHUB_ENV
           echo "GH_STRATEGY_JOB_TOTAL=${{ strategy.job-total }}" >> $GITHUB_ENV
+          cat $GITHUB_EVENT_PATH
 
       - name: Prepare environment & load last run from cache
         env:
