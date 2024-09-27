@@ -51,7 +51,7 @@ jobs:
       - name: Run Tests
         working-directory: ./basic
         run: |
-          COMMAND="playwright test --config playwright.config.reporter.ts $EXTRA_PW_FLAGS"
+          COMMAND="npx playwright test --config playwright.config.reporter.ts $EXTRA_PW_FLAGS"
           echo "Running command: $COMMAND"
           $COMMAND
 
