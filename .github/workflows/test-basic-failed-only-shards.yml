@@ -38,15 +38,18 @@ jobs:
           npm install -g @currents/cmd@beta
 
       - name: Prepare environment & load last run from cache
-        env:
-          DEBUG: "currents,currents:*"
+        continue-on-error: true
+        # env:
+        #   DEBUG: "currents,currents:*"
         run: |
           npx currents cache get \
             --preset last-run \
             --preset-output .preset_output \
             --matrix-index ${{ matrix.shard }} \
-            --matrix-total ${{ strategy.job-total }}
-          echo "EXTRA_PW_FLAGS=$(cat .preset_output)" >> $GITHUB_ENV
+            --matrix-total ${{ strategy.job-total }} || true
+          if [ -f .preset_output ]; then
+            echo "EXTRA_PW_FLAGS=$(cat .preset_output)" >> $GITHUB_ENV
+          fi
 
       - name: Run Tests
         working-directory: ./basic
@@ -56,8 +59,8 @@ jobs:
           $COMMAND
 
       - name: Cache the last run results
-        env:
-          DEBUG: "currents,currents:*"
+        # env:
+        #   DEBUG: "currents,currents:*"
         if: ${{ always() }}
         run: |
           npx currents cache set \
