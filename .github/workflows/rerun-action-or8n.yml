@@ -40,7 +40,7 @@ jobs:
 
       - name: Playwright Last Failed action
         id: last-failed-action
-        uses: vCaisim/playwright-last-failed@v1.0.10
+        uses: vCaisim/playwright-last-failed@v1.0.11
         with:
           debug: true
           or8n: true
