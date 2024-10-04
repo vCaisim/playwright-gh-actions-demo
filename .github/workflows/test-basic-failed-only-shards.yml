@@ -47,7 +47,7 @@ jobs:
             --preset-output .preset_output \
             --matrix-index ${{ matrix.shard }} \
             --matrix-total ${{ strategy.job-total }} \
-            --no-fail
+            --continue
           echo "EXTRA_PW_FLAGS=$(cat .preset_output)" >> $GITHUB_ENV
 
       - name: Run Tests

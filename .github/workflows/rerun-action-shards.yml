@@ -38,7 +38,7 @@ jobs:
 
       - name: Playwright Last Failed action
         id: last-failed-action
-        uses: vCaisim/playwright-last-failed@v1.0.9
+        uses: vCaisim/playwright-last-failed@v1.0.10
         with:
           debug: true
           pw-output-dir: basic/test-results
