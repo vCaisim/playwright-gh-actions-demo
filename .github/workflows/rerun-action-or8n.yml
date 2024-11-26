@@ -1,4 +1,4 @@
-name: rerun-action-or8n
+name: failed-only-or8n
 
 on:
   workflow_dispatch:
@@ -13,12 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:latest
     env:
-      CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
+      CURRENTS_PROJECT_ID: mdXsz8
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-      CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
-      CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
+      CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
       CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
-      CURRENTS_REST_API_URL: ${{ secrets.CURRENTS_REST_API_URL }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,10 +26,9 @@ jobs:
       - run: |
           echo "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
       - uses: actions/setup-node@v4
         with:
-          node-version: "18.x"
+          node-version: "20.x"
 
       - name: Install dependencies
         run: |
@@ -40,14 +37,14 @@ jobs:
 
       - name: Playwright Last Failed action
         id: last-failed-action
-        uses: vCaisim/playwright-last-failed@v1.0.11
+        uses: vCaisim/playwright-last-failed@v1.0.12
         with:
-          debug: true
           or8n: true
-          # previous-ci-build-id: default is ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt - 1 }}
+          # debug: true
+          previous-ci-build-id: or8n-${{ github.repository }}-${{ github.run_id }}-<decr>${{ github.run_attempt }}</decr>
           pw-output-dir: basic/test-results
 
-      - name: Run Tests
+      - name: Playwright Tests
         working-directory: ./basic
         run: |
           COMMAND="npx pwc-p ${{ steps.last-failed-action.outputs.extra-pw-flags }}"
