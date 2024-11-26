@@ -15,7 +15,7 @@ jobs:
     env:
       CURRENTS_PROJECT_ID: mdXsz8
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-      CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_CI_BUILD_ID: reporter-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +39,7 @@ jobs:
         uses: vCaisim/playwright-last-failed@v1.0.11
         with:
           # debug: true
+          previous-ci-build-id: reporter-${{ github.repository }}-${{ github.run_id }}-<decr>${{ github.run_attempt }}</decr>
           pw-output-dir: basic/test-results
           matrix-index: ${{ matrix.shard }}
           matrix-total: ${{ strategy.job-total }}
