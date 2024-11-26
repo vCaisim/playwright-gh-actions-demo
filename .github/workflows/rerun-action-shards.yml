@@ -1,4 +1,4 @@
-name: rerun-action-shards
+name: failed-only-shards
 
 on:
   workflow_dispatch:
@@ -13,10 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:latest
     env:
-      CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
+      CURRENTS_PROJECT_ID: mdXsz8
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-      CURRENTS_CI_BUILD_ID: shards-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
-      CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
+      CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,10 +25,9 @@ jobs:
       - run: |
           echo "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
       - uses: actions/setup-node@v4
         with:
-          node-version: "18.x"
+          node-version: "20.x"
 
       - name: Install dependencies
         run: |
@@ -40,12 +38,12 @@ jobs:
         id: last-failed-action
         uses: vCaisim/playwright-last-failed@v1.0.11
         with:
-          debug: true
+          # debug: true
           pw-output-dir: basic/test-results
           matrix-index: ${{ matrix.shard }}
           matrix-total: ${{ strategy.job-total }}
 
-      - name: Run Tests
+      - name: Playwright Tests
         working-directory: ./basic
         run: |
           COMMAND="npx pwc ${{ steps.last-failed-action.outputs.extra-pw-flags }}"
