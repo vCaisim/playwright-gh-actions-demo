@@ -15,7 +15,7 @@ jobs:
     env:
       CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-      CURRENTS_CI_BUILD_ID: reporter-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_CI_BUILD_ID: reporter-${{ github.repository }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
       CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
 
       - name: Playwright Last Failed action
         id: last-failed-action
-        uses: vCaisim/playwright-last-failed@v1.0.11
+        uses: vCaisim/playwright-last-failed@v1
         with:
           debug: true
           pw-output-dir: basic/test-results

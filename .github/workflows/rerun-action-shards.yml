@@ -1,4 +1,4 @@
-name: failed-only-shards
+name: rerun-action-shards
 
 on:
   workflow_dispatch:
@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:latest
     env:
-      CURRENTS_PROJECT_ID: mdXsz8
+      CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-      CURRENTS_CI_BUILD_ID: reporter-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_CI_BUILD_ID: pwc-${{ github.repository }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,10 +36,9 @@ jobs:
 
       - name: Playwright Last Failed action
         id: last-failed-action
-        uses: vCaisim/playwright-last-failed@v1.0.11
+        uses: vCaisim/playwright-last-failed@v1
         with:
           # debug: true
-          previous-ci-build-id: reporter-${{ github.repository }}-${{ github.run_id }}-<decr>${{ github.run_attempt }}</decr>
           pw-output-dir: basic/test-results
           matrix-index: ${{ matrix.shard }}
           matrix-total: ${{ strategy.job-total }}

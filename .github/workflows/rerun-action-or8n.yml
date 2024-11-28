@@ -1,4 +1,4 @@
-name: failed-only-or8n
+name: rerun-action-or8n
 
 on:
   workflow_dispatch:
@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:latest
     env:
-      CURRENTS_PROJECT_ID: mdXsz8
+      CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
-      CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_CI_BUILD_ID: or8n-${{ github.repository }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
       CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -37,11 +37,11 @@ jobs:
 
       - name: Playwright Last Failed action
         id: last-failed-action
-        uses: vCaisim/playwright-last-failed@v1.0.12
+        uses: vCaisim/playwright-last-failed@v1
         with:
           or8n: true
           # debug: true
-          previous-ci-build-id: or8n-${{ github.repository }}-${{ github.run_id }}-<decr>${{ github.run_attempt }}</decr>
+          previous-ci-build-id: or8n-${{ github.repository }}-${{ github.run_id }}-attempt-<%= ${{ github.run_attempt }}-1 %>
           pw-output-dir: basic/test-results
 
       - name: Playwright Tests
