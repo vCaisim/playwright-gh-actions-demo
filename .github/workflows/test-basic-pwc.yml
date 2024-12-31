@@ -43,5 +43,6 @@ jobs:
         env:
           CURRENTS_PROJECT_ID: ${{ secrets.CURRENTS_PROJECT_ID }}
           CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+          CURRENTS_API_URL: ${{ secrets.CURRENTS_API_URL }}
         run: |
           npx pwc --shard=${{ matrix.shard }}/${{ strategy.job-total }}
