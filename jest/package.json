@@ -1,0 +1,22 @@
+{
+  "name": "examples",
+  "version": "0.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "report": "CURRENTS_API_URL=http://localhost:1234 currents --key 4uC6gBnwVYqm68Ht --project-id J7Nnli",
+    "build": "echo \"No build specified\" && exit 0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.24.3",
+    "@babel/preset-typescript": "^7.24.1",
+    "@currents/jest": "*",
+    "@currents/cmd": "*",
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
