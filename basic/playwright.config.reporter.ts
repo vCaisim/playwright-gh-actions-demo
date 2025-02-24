@@ -1,2 +1,2 @@
 import config from "./pw.config.shared";
-export default { ...config, reporter: [["@currents/playwright"]] };
+export default { ...config, reporter: [["@currents/playwright", { coverage: { projects: true }}]] };
