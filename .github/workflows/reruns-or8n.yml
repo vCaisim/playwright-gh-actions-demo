@@ -3,8 +3,6 @@ name: failed-only-or8n
 on:
   workflow_dispatch:
   push:
-    branches:
-      - feat/test-or8n-reruns
 
 jobs:
   test-or8n:
