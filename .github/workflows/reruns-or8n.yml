@@ -48,6 +48,6 @@ jobs:
       - name: Playwright Tests
         working-directory: ./basic
         run: |
-          COMMAND="npx pwc-p ${{ steps.last-failed-action.outputs.extra-pw-flags }}"
+          COMMAND="DEBUG=currents,currents:* npx pwc-p ${{ steps.last-failed-action.outputs.extra-pw-flags }}"
           echo "Running command: $COMMAND"
           $COMMAND
