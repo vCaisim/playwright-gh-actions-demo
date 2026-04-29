@@ -34,10 +34,11 @@ jobs:
           npm ci
           npx playwright install chrome
 
-      # Empty env values override currents.config.ts; only set when non-empty.
+      # Only append to GITHUB_ENV when non-empty (empty CURRENTS_API_URL would break ?? fallbacks in Node).
+      # API URL may be a repo/org variable or a secret (secrets are common for self-hosted / staging URLs).
       - name: Optional Currents API URL and record key
         env:
-          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL }}
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
           CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
         run: |
           if [ -n "$CURRENTS_API_URL_INPUT" ]; then
