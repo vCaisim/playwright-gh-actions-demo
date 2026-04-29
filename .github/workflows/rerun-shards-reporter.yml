@@ -14,9 +14,7 @@ jobs:
     container: mcr.microsoft.com/playwright:v1.58.2-jammy
     env:
       CURRENTS_CI_BUILD_ID: reporter-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
-      CURRENTS_API_URL: ${{ vars.CURRENTS_API_URL }}
       CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
-      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,6 +32,23 @@ jobs:
         run: |
           npm ci
           npx playwright install chrome
+
+      # Empty env values override currents.config.ts; only set when non-empty.
+      - name: Optional Currents API URL and record key
+        env:
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL }}
+          CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
+        run: |
+          if [ -n "$CURRENTS_API_URL_INPUT" ]; then
+            echo "CURRENTS_API_URL=$CURRENTS_API_URL_INPUT" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$CURRENTS_RECORD_KEY_INPUT" ]; then
+            {
+              echo "CURRENTS_RECORD_KEY<<CURR_EOF"
+              printf '%s\n' "$CURRENTS_RECORD_KEY_INPUT"
+              echo "CURR_EOF"
+            } >> "$GITHUB_ENV"
+          fi
 
       - name: Playwright Last Failed action
         id: last-failed-action
