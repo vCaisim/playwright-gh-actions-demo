@@ -1,8 +1,7 @@
 name: failed-only-shards
 
 on:
-  workflow_dispatch:
-  push:
+  pull_request:
 
 jobs:
   test-shards:
