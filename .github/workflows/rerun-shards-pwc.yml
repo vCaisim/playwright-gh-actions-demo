@@ -16,14 +16,25 @@ jobs:
       CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
       CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
     steps:
+      # PR head (not merge commit) so git message ≠ PR title from ghaEventData.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       # https://github.com/actions/runner-images/issues/6775
       - run: |
           echo "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # Fixed tip message for title-mode testing (≠ PR title from ghaEventData).
+      - name: Set Currents commit info from PR head
+        run: |
+          {
+            echo "COMMIT_INFO_SHA=$(git rev-parse HEAD)"
+            echo "COMMIT_INFO_BRANCH=${{ github.head_ref }}"
+            echo "COMMIT_INFO_MESSAGE=chore: trigger workflow"
+          } >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20.x"
