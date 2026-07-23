@@ -26,13 +26,15 @@ jobs:
           echo "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      # Fixed tip message for title-mode testing (≠ PR title from ghaEventData).
+      # Tip commit message from PR head (≠ PR title from ghaEventData).
       - name: Set Currents commit info from PR head
         run: |
           {
             echo "COMMIT_INFO_SHA=$(git rev-parse HEAD)"
             echo "COMMIT_INFO_BRANCH=${{ github.head_ref }}"
-            echo "COMMIT_INFO_MESSAGE=chore: trigger workflow"
+            echo "COMMIT_INFO_MESSAGE<<EOF"
+            git log -1 --pretty=%B
+            echo "EOF"
           } >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
