@@ -57,7 +57,6 @@ Currents will collect the following information:
 
 ### Currents Dashboard Results
 
-
 Here's how the results are being displayed in Currents dashboard (recorded on November 2023).
 
 https://github.com/currents-dev/playwright-gh-actions-demo/assets/1637928/3a95c8d5-a4c1-44a6-be59-24fefb79b354
