@@ -61,7 +61,6 @@ Here's how the results are being displayed in Currents dashboard (recorded on No
 
 https://github.com/currents-dev/playwright-gh-actions-demo/assets/1637928/3a95c8d5-a4c1-44a6-be59-24fefb79b354
 
-
 ### PR Comment and Git Commit Status
 
 Currents will add inline information to GitHub Pull Request. Example: https://github.com/currents-dev/playwright-gh-actions-demo/pull/17.
