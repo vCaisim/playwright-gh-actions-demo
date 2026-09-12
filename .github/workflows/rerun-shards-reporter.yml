@@ -1,7 +1,11 @@
 name: failed-only-reporter
 
 on:
+<<<<<<< Updated upstream
   push:
+=======
+  # pull_request:
+>>>>>>> Stashed changes
 
 jobs:
   test-reporter:
