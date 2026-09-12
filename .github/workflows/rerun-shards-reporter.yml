@@ -1,7 +1,7 @@
 name: failed-only-reporter
 
 on:
-  push:
+  # pull_request:
 
 jobs:
   test-reporter:
@@ -11,11 +11,10 @@ jobs:
         shard: [1, 2, 3]
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.49.0-noble
+    container: mcr.microsoft.com/playwright:v1.58.2-jammy
     env:
-      CURRENTS_PROJECT_ID: bnsqNa
-      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
       CURRENTS_CI_BUILD_ID: reporter-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +32,24 @@ jobs:
         run: |
           npm ci
           npx playwright install chrome
+
+      # Only append to GITHUB_ENV when non-empty (empty CURRENTS_API_URL would break ?? fallbacks in Node).
+      # API URL may be a repo/org variable or a secret (secrets are common for self-hosted / staging URLs).
+      - name: Optional Currents API URL and record key
+        env:
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
+          CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
+        run: |
+          if [ -n "$CURRENTS_API_URL_INPUT" ]; then
+            echo "CURRENTS_API_URL=$CURRENTS_API_URL_INPUT" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$CURRENTS_RECORD_KEY_INPUT" ]; then
+            {
+              echo "CURRENTS_RECORD_KEY<<CURR_EOF"
+              printf '%s\n' "$CURRENTS_RECORD_KEY_INPUT"
+              echo "CURR_EOF"
+            } >> "$GITHUB_ENV"
+          fi
 
       - name: Playwright Last Failed action
         id: last-failed-action
