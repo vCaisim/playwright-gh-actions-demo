@@ -75,7 +75,7 @@ test("basic test @basic 6", async ({ page }) => {
 });
 
 
-test("basic test @basic", async ({ page }) => {
+test("basic test @basic 7", async ({ page }) => {
   await page.goto("https://demo.playwright.dev/todomvc");
 
   // Use locators to represent a selector and re-use them
@@ -87,7 +87,7 @@ test("basic test @basic", async ({ page }) => {
   await expect(todoList).toHaveText("Learn Playwright");
 });
 
-test("basic test @basic", async ({ page }) => {
+test("basic test @basic 8", async ({ page }) => {
   await page.goto("https://demo.playwright.dev/todomvc");
 
   // Use locators to represent a selector and re-use them
