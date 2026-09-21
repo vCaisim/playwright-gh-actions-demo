@@ -7,14 +7,18 @@
  * updates a run produces. Spec files do not: there is no INSTANCE_FINISH in the
  * webhook processor.
  *
- * The stagger is what keeps the renders apart. The orchestrator drops an event
- * whose rendered comment is byte-identical to the stored one, and keys each
- * queued edit on that render's hash, so groups finishing at the same instant
- * collapse into a single delivery and no race happens. Finishing 250ms apart
- * gives each group a different board, while staying well under the few hundred
- * milliseconds a delivery spends on its GitHub round trips.
+ * The step has to clear the webhook pipeline. `reportWebhook` reads the run
+ * document fresh when it processes an event and renders the board from that, so
+ * two groups finishing inside one pipeline turnaround both render the run's
+ * state as of the later one. The orchestrator hashes the body with the
+ * ownership marker stripped, so those identical boards collapse into a single
+ * delivery and there is nothing left to race.
+ *
+ * Three seconds is well past a local change-stream turnaround. It does not need
+ * to be small: the deliveries are reordered at delivery time by raceDelay.ts in
+ * the currents repo, not by how far apart the groups finished.
  */
-export async function finishInSequence(projectName: string, stepMs = 250) {
+export async function finishInSequence(projectName: string, stepMs = 3000) {
   const barrierAt = Number(process.env.RACE_BARRIER_AT);
   if (!barrierAt) {
     throw new Error(

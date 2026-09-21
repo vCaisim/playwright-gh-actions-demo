@@ -8,7 +8,8 @@ import { defineConfig } from "@playwright/test";
  * comment deliveries.
  *
  * Eight workers so the projects run at once, and `barrier.ts` releases them
- * 250ms apart so their boards differ.
+ * three seconds apart — far enough for each group's board to reach the webhook
+ * pipeline as a distinct render rather than collapsing into the previous one.
  *
  * No browser and no web server: the scenario is about delivery timing, and a
  * page load would only add jitter.
@@ -16,8 +17,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig<CurrentsFixtures, CurrentsWorkerFixtures>({
   testDir: "./specs",
   globalSetup: "./globalSetup.ts",
-  // Longer than the barrier wait plus the whole staircase.
-  timeout: 60 * 1000,
+  // Longer than the 30s barrier plus the 21s staircase.
+  timeout: 120 * 1000,
   fullyParallel: true,
   workers: 8,
   retries: 0,
