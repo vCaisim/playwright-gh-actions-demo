@@ -203,7 +203,7 @@ counter-example is a real finding.
 
 ### Scenario A — eight groups of one run
 
-**This one does not reproduce the stale comment, by construction.** The groups
+**On its own this one does not reproduce the stale comment, by construction.** The groups
 finish 250ms apart, so the deliveries start in render order and each takes about
 the same time, which means they also finish in render order — and the newest
 render writing last is the correct outcome. The staircase that defeats the
@@ -237,6 +237,52 @@ finished group-3 at 1789999602320
 
 They should be about 250ms apart. If several share an instant, their boards were
 identical and the content-hash gate collapsed them into one delivery.
+
+#### Making scenario A reproduce it
+
+The reason A is safe is that its deliveries keep their order. Remove the order
+and it races like B does, within one run instead of between runs — which is worth
+having, because it exercises the other branch of `canWriteOverComment`: B covers
+the `runStartedAt` comparison between runs, A-with-the-hook covers the
+`snapshotAt` comparison inside one.
+
+Add `packages/notifications-service/src/github/raceDelay.ts` (it is in this
+repo's PR description, or ask for it again) and call it once, before anything
+reads the comment:
+
+```ts
+// on feat/run-comment-status-board, just above `const lastComment = await findExistingComment(`
+await waitForRaceWindow(commentBody);
+
+// on fix/lock-run-comment-delivery, just above `return await withRunCommentLock(`
+await waitForRaceWindow(params.commentBody);
+```
+
+On the lock branch it has to go **before** the lock is taken, not inside it. A
+delivery that sleeps while holding the lock burns the 20s lease and lets a second
+one in, which is a different bug and would muddy the result.
+
+The hook holds every delivery of a run until `runStartedAt + RACE_CONVERGE_MS`.
+That anchor is the same value in every delivery's own marker, so they converge
+without coordinating; anything derived from `snapshotAt` differs per delivery and
+would preserve the spacing. Verified: eight deliveries that would step 250ms
+apart write within 2ms of each other.
+
+```bash
+RACE_CONVERGE_MS=60000   # on the change-streams process
+```
+
+Set it longer than the run takes to reach its last group, or the early deliveries
+have nothing left to wait for — the hook warns
+`RACE_CONVERGE_MS window already passed, delivery not held` when that happens,
+which means the run proved nothing.
+
+|                 | without the lock                              | with the lock                                                      |
+| --------------- | --------------------------------------------- | ------------------------------------------------------------------ |
+| **final board** | often stale — groups left on `🔄 In Progress` | correct, all eight `✅ Passed`                                     |
+| **logs**        | every delivery reports success                | the superseded ones log `Skipping PR comment: a newer run owns it` |
+
+Remove the hook and its call when you are done; neither belongs in the branch.
 
 ### Scenario C — control, one group
 
