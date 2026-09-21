@@ -1,0 +1,139 @@
+name: run-comment-race
+
+# Reproduces the concurrent run comment deliveries that ENG-1421 is about.
+# Pick a scenario by putting [a], [b] or [c] in the commit subject, or run the
+# workflow by hand. Without a marker the commit runs scenario A.
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Which scenario to run
+        type: choice
+        default: a
+        options: [a, b, c]
+
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    outputs:
+      scenario: ${{ steps.pick.outputs.scenario }}
+      dir: ${{ steps.pick.outputs.dir }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - id: pick
+        env:
+          DISPATCH_SCENARIO: ${{ github.event.inputs.scenario }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DISPATCH_SCENARIO:-}" ]; then
+            scenario="$DISPATCH_SCENARIO"
+          else
+            subject=$(git log -1 --pretty=%s)
+            echo "commit subject: $subject"
+            case "$subject" in
+              *\[b\]*) scenario=b ;;
+              *\[c\]*) scenario=c ;;
+              *)       scenario=a ;;
+            esac
+          fi
+
+          case "$scenario" in
+            a) dir=scenario-a-parallel-groups ;;
+            b) dir=scenario-b-two-runs ;;
+            c) dir=scenario-c-control ;;
+          esac
+
+          echo "scenario: $scenario ($dir)"
+          echo "scenario=$scenario" >> "$GITHUB_OUTPUT"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+  race:
+    needs: pick
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.58.2-jammy
+    env:
+      CURRENTS_CI_BUILD_ID: race-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: |
+          echo "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      # No browser install: these specs never open a page, so the run is about
+      # delivery timing and nothing else.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Optional Currents API URL and record key
+        env:
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
+          CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
+        run: |
+          if [ -n "$CURRENTS_API_URL_INPUT" ]; then
+            echo "CURRENTS_API_URL=$CURRENTS_API_URL_INPUT" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$CURRENTS_RECORD_KEY_INPUT" ]; then
+            {
+              echo "CURRENTS_RECORD_KEY<<CURR_EOF"
+              printf '%s\n' "$CURRENTS_RECORD_KEY_INPUT"
+              echo "CURR_EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
+      # Scenario B needs two runs that start at clearly different times and
+      # finish at the same one. Two matrix jobs cannot do that: each spends a
+      # minute or two on checkout and npm ci, those durations vary
+      # independently, and the offset between the runs is whatever CI happens to
+      # give. Two processes on one runner put it under this script's control.
+      # Separate --output keeps them off each other's results, and both sit
+      # under test-results/ so .gitignore already covers them.
+      - name: Run scenario ${{ needs.pick.outputs.scenario }}
+        working-directory: ./${{ needs.pick.outputs.dir }}
+        env:
+          SCENARIO: ${{ needs.pick.outputs.scenario }}
+        run: |
+          if [ "$SCENARIO" != "b" ]; then
+            exec npx pwc
+          fi
+
+          # b1 starts now and works for 6s; b2 starts 3s later and works for 3s,
+          # so b2 is unambiguously the newer run and both finish together.
+          # Ownership is decided by runStartedAt with a `>=` comparison, so two
+          # runs starting in the same millisecond could each write over the other
+          # and there would be no correct owner to check the comment against.
+          # Finishing together is what makes their deliveries overlap.
+          #
+          # A prefix assignment does not change this shell's own
+          # CURRENTS_CI_BUILD_ID, so the second line still sees the base value.
+          RUN_WORK_MS=6000 CURRENTS_CI_BUILD_ID="${CURRENTS_CI_BUILD_ID}-b1" \
+            npx pwc -- --output=test-results/b1 &
+          first=$!
+
+          sleep 3
+
+          RUN_WORK_MS=3000 CURRENTS_CI_BUILD_ID="${CURRENTS_CI_BUILD_ID}-b2" \
+            npx pwc -- --output=test-results/b2 &
+          second=$!
+
+          # Wait for both before failing, so one run's failure does not hide what
+          # the other did.
+          first_status=0
+          second_status=0
+          wait "$first" || first_status=$?
+          wait "$second" || second_status=$?
+          echo "run b1 exited $first_status, run b2 exited $second_status"
+          [ "$first_status" -eq 0 ] && [ "$second_status" -eq 0 ]

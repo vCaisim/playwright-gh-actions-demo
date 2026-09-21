@@ -1,7 +1,12 @@
 name: failed-only-shards
 
 on:
-  pull_request:
+  # Disabled while the run-comment-race scenarios are in use: this workflow
+  # reports to the same Currents project, so its shards write the same pull
+  # request comment and make the scenario results unreadable. Uncomment to get
+  # it back.
+  # pull_request:
+  workflow_dispatch:
 
 jobs:
   test-shards:
