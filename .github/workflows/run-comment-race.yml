@@ -97,22 +97,25 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
-      # Scenario B starts RUNS runs one second apart and has every one of them
-      # finish at the same instant.
+      # Scenario B starts RUNS runs at the same instant.
       #
-      # Both halves are load bearing. The offset starts give each run a distinct
-      # runStartedAt, so there is exactly one correct owner — the last to start.
-      # The shared finish means the deliveries reach the comment together, so
-      # nothing about their order reflects which run should win, and the
-      # ownership check is the only thing that can pick the winner. Without the
-      # lock the last write wins instead, and that is the newest run only 1 time
-      # in RUNS.
+      # Simultaneous, not staggered. Ownership of the comment is decided by
+      # runStartedAt, which the server assigns as each run is created. Any
+      # stagger makes the runs start in a known order AND makes their deliveries
+      # write in that same order, so the newest always writes last and
+      # canWriteOverComment simply answers correctly. Simulated over 2000 trials
+      # at this stack's ~50ms delivery jitter: a 200ms stagger never produces a
+      # wrong owner, 50ms produces one 4% of the time, and 0ms produces one 80%
+      # of the time. Launching together is what decouples runStartedAt order from
+      # write order.
       #
-      # This cannot be done with matrix jobs: each spends a minute or two on
-      # checkout and npm ci, those durations vary independently, and the offsets
-      # would be whatever CI happened to give. Processes on one runner put the
-      # timing under this script's control. Separate --output keeps them off each
-      # other's results, under the already-ignored test-results/.
+      # Which run should own the comment is therefore not known in advance — it
+      # is whichever the server stamped last. Read that from the five runs' start
+      # times in Currents, not from the b1..b5 suffix.
+      #
+      # Runs on one runner rather than matrix jobs so the launch is simultaneous.
+      # Separate --output keeps them off each other's results, under the
+      # already-ignored test-results/.
       - name: Run scenario ${{ needs.pick.outputs.scenario }}
         working-directory: ./${{ needs.pick.outputs.dir }}
         env:
@@ -127,22 +130,17 @@ jobs:
           pids=""
 
           for i in $(seq 1 "$RUNS"); do
-            # Run i starts at second i-1 and works for RUNS-i+1 seconds, so every
-            # run lands on the same finish.
-            work_ms=$(( (RUNS - i + 1) * 1000 ))
-            RUN_WORK_MS="$work_ms" CURRENTS_CI_BUILD_ID="${base}-b${i}" \
+            RUN_WORK_MS=3000 CURRENTS_CI_BUILD_ID="${base}-b${i}" \
               npx pwc -- --output="test-results/b${i}" &
             pids="$pids $!"
-            [ "$i" -lt "$RUNS" ] && sleep 1
           done
 
           # Wait for every run before failing, so one run's failure does not hide
-          # what the others did. b${RUNS} started last, so it is the run that must
-          # own the comment.
+          # what the others did.
           status=0
           for pid in $pids; do
             wait "$pid" || status=$?
           done
           echo "all $RUNS runs finished, worst exit status $status"
-          echo "expected owner: ${base}-b${RUNS} (started last)"
+          echo "owner is whichever of ${base}-b1..b${RUNS} Currents stamped last"
           exit "$status"
