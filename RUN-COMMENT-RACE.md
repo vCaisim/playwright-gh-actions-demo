@@ -12,7 +12,7 @@ run opens that comment at run start, takes ownership of it with a second marker,
 and rewrites it on every later event. Each rewrite is one delivery, and
 deliveries run in parallel (the local change-streams worker runs ten at a time).
 
-Two runs of the same project therefore share one comment and have to agree on who
+Runs of the same project therefore share one comment and have to agree on who
 owns it. That is scenario B.
 
 The webhook processor raises exactly three events, all of them **per group**
@@ -40,16 +40,30 @@ each finishes with a different number of tests done, so each renders a different
 board. 250ms is well under the few hundred milliseconds a delivery spends on its
 GitHub round trips, so the deliveries are still in flight together.
 
-Each delivery reads the comment, decides whether its render is newer, then
-writes. Without a lock the read and the write of two deliveries interleave, both
-decide they are newer, and whichever writes last wins — which may be the one
-carrying the older board.
+Each delivery reads the comment, decides whether it may write, then writes.
+`canWriteOverComment` makes that decision from the ownership marker: within one
+run it compares `snapshotAt`, and between runs it compares `runStartedAt`, so the
+run that started later owns the comment. GitHub has no conditional comment
+update, so that check cannot be part of the write — between deciding and writing,
+another delivery decides the same thing, and whichever writes last wins.
 
-| folder                       | what overlaps                                | shows the bug?        |
-| ---------------------------- | -------------------------------------------- | --------------------- |
-| `scenario-a-parallel-groups` | eight group finishes of one run, 250ms apart | yes                   |
-| `scenario-b-two-runs`        | two runs sharing one pull request comment    | yes                   |
-| `scenario-c-control`         | nothing — one group                          | no, it is the control |
+**That only hurts when the last write carries the older render**, which is the
+part that decides whether a scenario reproduces anything:
+
+- Within one run, events are spaced out and the deliveries start in render
+  order, so they finish in render order too. The newest render writing last is
+  the correct answer, and nothing goes wrong. That is scenario A, and it is why
+  it does not show the bug.
+- Between runs that finish at the same instant, nothing about the order the
+  deliveries write in reflects which run should own the comment. The ownership
+  check is the only thing that can pick the winner, and without the lock it is
+  bypassed. That is scenario B.
+
+| folder                       | what overlaps                                | shows the bug?               |
+| ---------------------------- | -------------------------------------------- | ---------------------------- |
+| `scenario-b-racing-runs`     | five runs finishing at one instant           | yes — the one to use         |
+| `scenario-a-parallel-groups` | eight group finishes of one run, 250ms apart | no — see What you should see |
+| `scenario-c-control`         | nothing — one group                          | no, it is the control        |
 
 Scenario C does not race. An edit that arrives before the comment exists already
 backs off with `RetriableError('Run comment not posted yet')`, and that guard is
@@ -60,16 +74,22 @@ something else is wrong.
 ## Running one
 
 Push a commit to your pull request, as you already do. The scenario is chosen by
-a marker in the commit subject; no marker runs A.
+a marker in the commit subject; no marker runs B, the one that shows the bug.
 
 ```bash
-git commit --allow-empty -m "test: parallel groups"      # scenario A
-git commit --allow-empty -m "test: two runs [b]"         # scenario B
-git commit --allow-empty -m "test: control [c]"          # scenario C
+git commit --allow-empty -m "test: racing runs"           # scenario B
+git commit --allow-empty -m "test: parallel groups [a]"   # scenario A
+git commit --allow-empty -m "test: control [c]"           # scenario C
 git push
 ```
 
-Or run it by hand from the Actions tab — the workflow has a `scenario` input.
+Or run it by hand from the Actions tab — the workflow has a `scenario` input,
+which also defaults to B.
+
+Either way the branch needs an **open pull request**. The run comment is found
+from the commit's pull request, so a run on a branch without one produces no
+comment at all and the delivery logs `Skipping PR comment: No PR found` — which
+looks like a broken setup rather than a missing pull request.
 
 Run **one scenario per commit**. Every scenario reports to the same Currents
 project, so they all write the same pull request comment; two at once tells you
@@ -131,25 +151,83 @@ own three seconds. With the lock off they all sit in the window together.
 
 ## What you should see
 
-Run each scenario twice: once on `feat/run-comment-status-board` (no lock) and
-once on `fix/lock-run-comment-delivery` (lock). The comment on the pull request
-is the evidence; the logs confirm why.
+Run each scenario on `feat/run-comment-status-board` (no lock) and again on
+`fix/lock-run-comment-delivery` (lock). The comment on the pull request is the
+evidence; the logs confirm why.
+
+**Start with scenario B.** It is the only one that reproduces the stale comment.
+Scenario A shows the lock suppressing superseded writes but always ends on the
+correct board, and C is the control.
+
+### Scenario B — five runs finishing at one instant
+
+**This is the scenario that shows the bug.** Five runs start one second apart, so
+each has a distinct `runStartedAt` and exactly one of them — b5, the last to
+start — is the correct owner. Every run then aims at the same finish, so their
+deliveries reach the comment together and nothing about their order reflects
+which run should win.
+
+The ownership check is then the only thing that can pick the winner. Without the
+lock the last write wins instead, and that is b5 only one time in five.
+
+|                                | without the fix                                      | with the fix                                                   |
+| ------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------- |
+| **which run owns the comment** | whichever wrote last — b5 only about 1 run in 5      | always b5                                                      |
+| **the comment**                | usually shows an earlier run's board and links to it | b5's board                                                     |
+| **logs**                       | all five deliveries report success                   | the four losers log `Skipping PR comment: a newer run owns it` |
+
+The job log ends with the answer key:
+
+```
+expected owner: race-1234-1-b5 (started last)
+```
+
+Open the comment, follow its run link, and compare. If it lands on b1 through b4,
+the older run won — that is the bug.
+
+First check the finishes actually landed together. Each run prints its own line:
+
+```
+finished race-1234-1-b1 after 5000ms at 1790001629341
+finished race-1234-1-b5 after 1000ms at 1790001629464
+```
+
+Five Node processes on a two-core runner contend, so expect more spread than the
+~120ms this gets on a developer machine. Anything inside a few hundred
+milliseconds still overlaps a delivery. If they are seconds apart the runs never
+raced and the result means nothing either way.
+
+One run without the lock has about a four in five chance of showing the bug. Two
+runs put you at 96%. With the lock it should be b5 every time, and a single
+counter-example is a real finding.
 
 ### Scenario A — eight groups of one run
 
-|                             | without the fix                                                          | with the fix                                              |
-| --------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------- |
-| **the group table**         | one or more groups still say `🔄 In Progress` on a run that has finished | all eight say `✅ Passed`                                 |
-| **does it correct itself?** | no: the run is over, so nothing comes along to fix it                    | n/a                                                       |
-| **number of comments**      | one                                                                      | one                                                       |
-| **logs**                    | all eight deliveries report success                                      | the losers log `Skipping PR comment: a newer run owns it` |
+**This one does not reproduce the stale comment, by construction.** The groups
+finish 250ms apart, so the deliveries start in render order and each takes about
+the same time, which means they also finish in render order — and the newest
+render writing last is the correct outcome. The staircase that defeats the
+content-hash dedup also guarantees the right answer.
 
-A finished run with groups stuck on `🔄 In Progress` is the thing to look for.
-It is the whole bug in one line: the last write of the run carried an older
-render, and that render was taken before those groups finished.
+For the older render to land last, delivery order has to invert against render
+age. In production that comes from independent Lambda cold starts and variable
+GitHub latency; locally it would need one delivery to run 250ms slower than the
+next, which is uncommon.
 
-Before reading anything into the comment, check the staircase held. The job log
-carries one line per group:
+What it does show is the lock suppressing superseded writes:
+
+|                          | without the fix                      | with the fix                                                       |
+| ------------------------ | ------------------------------------ | ------------------------------------------------------------------ |
+| **edits to the comment** | one per group, around seven or eight | far fewer, around three                                            |
+| **final board**          | correct                              | correct                                                            |
+| **logs**                 | every delivery reports success       | the superseded ones log `Skipping PR comment: a newer run owns it` |
+
+A delivery that waited for the lock finds a newer render already on the comment
+and correctly stands down, so the edit never happens. That is worth seeing, but
+it is not the bug — for that, use scenario B.
+
+Before reading anything into a scenario A run, check the staircase held. The job
+log carries one line per group:
 
 ```
 finished group-1 at 1789999601819
@@ -158,30 +236,7 @@ finished group-3 at 1789999602320
 ```
 
 They should be about 250ms apart. If several share an instant, their boards were
-identical, the content-hash gate collapsed them into one delivery, and the run
-proved nothing either way — re-run it.
-
-### Scenario B — two runs on one pull request
-
-|                       | without the fix                                             | with the fix                                       |
-| --------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
-| **the comment**       | can end up showing **b1**, the older run, and linking to it | b2, the newer run                                  |
-| **which run owns it** | whichever wrote last, which is not always the newer one     | always b2                                          |
-| **logs**              | both runs' deliveries report success                        | b1 logs `Skipping PR comment: a newer run owns it` |
-
-Check the two `finished after ...` lines in the job log are close together
-before reading the comment; if they are seconds apart the deliveries never
-overlapped.
-
-Both runs are two processes on one runner, so nothing about CI timing can pull
-them apart. b1 starts first and works for six seconds; b2 starts three seconds
-later and works for three. That gives b2 an unambiguously later `runStartedAt`
-while both finish within a couple of hundred milliseconds of each other.
-
-Both halves are needed. Ownership is decided by `runStartedAt` with a `>=`
-comparison, so two runs starting in the same millisecond may each write over the
-other and there is no correct owner to check the comment against. Finishing
-together is what puts their deliveries in flight at the same time.
+identical and the content-hash gate collapsed them into one delivery.
 
 ### Scenario C — control, one group
 
@@ -193,14 +248,19 @@ together is what puts their deliveries in flight at the same time.
 Identical on both branches, by design. A difference here means the setup is
 wrong, not that the lock is doing something.
 
-### A note on combining the widener with scenario A
+### A note on combining the widener with these scenarios
 
-The widener adds three seconds inside the lock. With the lock on, eight groups
-then serialize into roughly 24 seconds, which is longer than the lock's 20s
-retry budget — so the last waiters give up and log
-`Another delivery holds the run comment`, then come back on a retry. That is
-correct behaviour, not a failure. If you would rather not see it, use the
-widener with four groups instead of eight, or drop it to one second.
+The widener adds three seconds inside the lock, so with the lock on the
+deliveries serialize at three seconds each.
+
+Scenario B is fine: five runs is fifteen seconds, inside the lock's 20s retry
+budget.
+
+Scenario A is not: eight groups is roughly twenty-four seconds, past that budget,
+so the last waiters give up and log `Another delivery holds the run comment`
+before coming back on a retry. That is correct behaviour rather than a failure,
+but if you would rather not see it, run A with four groups instead of eight, or
+drop the widener to one second.
 
 ## Watching it happen
 
@@ -231,6 +291,11 @@ git checkout packages/notifications-service/src/github/runCommentLock.ts \
 
 ## How the scenarios are built
 
+- **B** — one spec whose duration comes from `RUN_WORK_MS`, launched five times
+  as concurrent processes in a single workflow step. Run `i` starts at second
+  `i-1` and works for `RUNS-i+1` seconds, so the starts are a second apart and
+  the finishes land together. Distinct `CURRENTS_CI_BUILD_ID` values are what
+  make them five runs rather than five machines of one.
 - **A** — one spec, eight Playwright projects (so eight Currents groups), eight
   workers. `globalSetup.ts` fixes one instant for the whole run and `barrier.ts`
   releases the groups from it 250ms apart. The stagger is what defeats the
@@ -238,11 +303,6 @@ git checkout packages/notifications-service/src/github/runCommentLock.ts \
   boards do not. If orchestration overruns the barrier the staircase still
   holds — the step is added to whatever is left of the barrier, not to the
   barrier itself.
-- **B** — one spec whose duration comes from `RUN_WORK_MS`, launched twice as
-  concurrent processes in a single workflow step under two different
-  `CURRENTS_CI_BUILD_ID` values. Different build ids is what makes them two runs
-  rather than two machines of one; the offset start with matching finish is what
-  makes one of them clearly newer while their deliveries still collide.
 - **C** — one spec that does nothing, one group, so nothing overlaps.
 
 None of them launch a browser. The scenarios are about delivery timing, and a
