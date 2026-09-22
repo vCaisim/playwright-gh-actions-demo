@@ -1,0 +1,158 @@
+name: run-comment-race
+
+# Reproduces the concurrent run comment deliveries that ENG-1421 is about.
+# Pick a scenario by putting [b] or [c] in the commit subject, or run the
+# workflow by hand. Without a marker the commit runs scenario A, the one that
+# reproduces the stale comment every time.
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Which scenario to run
+        type: choice
+        default: a
+        options: [a, b, c]
+
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    outputs:
+      scenario: ${{ steps.pick.outputs.scenario }}
+      dir: ${{ steps.pick.outputs.dir }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - id: pick
+        env:
+          DISPATCH_SCENARIO: ${{ github.event.inputs.scenario }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DISPATCH_SCENARIO:-}" ]; then
+            scenario="$DISPATCH_SCENARIO"
+          else
+            subject=$(git log -1 --pretty=%s)
+            echo "commit subject: $subject"
+            # A is the default: it is the one that shows the bug on every run.
+            # B and C have to be asked for.
+            case "$subject" in
+              *\[b\]*) scenario=b ;;
+              *\[c\]*) scenario=c ;;
+              *)       scenario=a ;;
+            esac
+          fi
+
+          case "$scenario" in
+            a) dir=scenario-a-parallel-groups ;;
+            b) dir=scenario-b-racing-runs ;;
+            c) dir=scenario-c-control ;;
+          esac
+
+          echo "scenario: $scenario ($dir)"
+          echo "scenario=$scenario" >> "$GITHUB_OUTPUT"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+  race:
+    needs: pick
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.58.2-jammy
+    env:
+      CURRENTS_CI_BUILD_ID: race-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: |
+          echo "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      # No browser install: these specs never open a page, so the run is about
+      # delivery timing and nothing else.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Optional Currents API URL and record key
+        env:
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
+          CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
+        run: |
+          if [ -n "$CURRENTS_API_URL_INPUT" ]; then
+            echo "CURRENTS_API_URL=$CURRENTS_API_URL_INPUT" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$CURRENTS_RECORD_KEY_INPUT" ]; then
+            {
+              echo "CURRENTS_RECORD_KEY<<CURR_EOF"
+              printf '%s\n' "$CURRENTS_RECORD_KEY_INPUT"
+              echo "CURR_EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
+      # Scenario B starts RUNS runs that are created at the same instant, with the
+      # same work, so they start together and finish together.
+      #
+      # Forking them together is not enough. Each `npx pwc` spends a second or
+      # more booting before it creates its run, and several booting at once on a
+      # two-core runner spread over seconds — at which point the last-created run
+      # claims the comment at its own RUN_START and every older run's finish
+      # delivery correctly skips. RACE_START_AT holds each process in
+      # currents.config.ts until one instant, just before it creates the run.
+      # Modelled over 5000 runs: the comment goes to the wrong run 82% of the time
+      # when the creations land together, 60% when they spread over 400ms, and 17%
+      # over 3s.
+      #
+      # Six, not more. With the lock their deliveries serialise, each holding it
+      # for RACE_WRITE_HOLD_MS plus two GitHub calls, and the last one to arrive
+      # has to outwait all the others inside the mutex's 20 second retry policy.
+      #
+      # Which run should own the comment is not known in advance — it is
+      # whichever the server stamped last. Read that from the runs' start times in
+      # Currents, not from the b1..bN suffix.
+      #
+      # Runs on one runner rather than matrix jobs so they share the clock
+      # RACE_START_AT is expressed in. Separate --output keeps them off each
+      # other's results, under the already-ignored test-results/.
+      - name: Run scenario ${{ needs.pick.outputs.scenario }}
+        working-directory: ./${{ needs.pick.outputs.dir }}
+        env:
+          SCENARIO: ${{ needs.pick.outputs.scenario }}
+        run: |
+          if [ "$SCENARIO" != "b" ]; then
+            exec npx pwc
+          fi
+
+          RUNS=6
+          base="$CURRENTS_CI_BUILD_ID"
+          pids=""
+
+          # Long enough for every `npx pwc` to boot and reach currents.config.ts.
+          # If one arrives late it creates its run late, and that run wins the
+          # comment on its own — the job log says how long each one waited.
+          RACE_START_AT=$(( $(date +%s%3N) + 25000 ))
+          export RACE_START_AT
+          echo "runs are created at $RACE_START_AT"
+
+          for i in $(seq 1 "$RUNS"); do
+            RUN_WORK_MS=3000 CURRENTS_CI_BUILD_ID="${base}-b${i}" \
+              npx pwc -- --output="test-results/b${i}" &
+            pids="$pids $!"
+          done
+
+          # Wait for every run before failing, so one run's failure does not hide
+          # what the others did.
+          status=0
+          for pid in $pids; do
+            wait "$pid" || status=$?
+          done
+          echo "all $RUNS runs finished, worst exit status $status"
+          echo "owner is whichever of ${base}-b1..b${RUNS} Currents stamped last"
+          exit "$status"
