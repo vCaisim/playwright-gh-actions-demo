@@ -12,3 +12,4 @@ test("basic test @basic", async ({ page }) => {
   await inputBox.press("Enter");
   await expect(todoList).toHaveText("Learn Playwright");
 });
+

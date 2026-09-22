@@ -38,6 +38,78 @@ const config = defineConfig<CurrentsFixtures, CurrentsWorkerFixtures>({
         ...devices["Desktop Chrome"],
       },
     },
+    {
+      name: "Project C",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C2",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C3",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C4",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C5",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C6",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C7",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C8",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "Project C9",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
   ],
 
   webServer: {
