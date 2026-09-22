@@ -1,9 +1,9 @@
 name: run-comment-race
 
 # Reproduces the concurrent run comment deliveries that ENG-1421 is about.
-# Pick a scenario by putting [a] or [c] in the commit subject, or run the
-# workflow by hand. Without a marker the commit runs scenario B, the only one
-# that reproduces the stale comment.
+# Pick a scenario by putting [b] or [c] in the commit subject, or run the
+# workflow by hand. Without a marker the commit runs scenario A, the one that
+# reproduces the stale comment every time.
 on:
   pull_request:
   workflow_dispatch:
@@ -11,8 +11,8 @@ on:
       scenario:
         description: Which scenario to run
         type: choice
-        default: b
-        options: [b, a, c]
+        default: a
+        options: [a, b, c]
 
 jobs:
   pick:
@@ -35,12 +35,12 @@ jobs:
           else
             subject=$(git log -1 --pretty=%s)
             echo "commit subject: $subject"
-            # B is the default: it is the one that shows the bug. A and C have
-            # to be asked for.
+            # A is the default: it is the one that shows the bug on every run.
+            # B and C have to be asked for.
             case "$subject" in
-              *\[a\]*) scenario=a ;;
+              *\[b\]*) scenario=b ;;
               *\[c\]*) scenario=c ;;
-              *)       scenario=b ;;
+              *)       scenario=a ;;
             esac
           fi
 
@@ -97,21 +97,22 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
-      # Scenario B starts RUNS runs at the same instant.
+      # Scenario B starts RUNS runs at the same instant, with the same work, so
+      # they start together and finish together.
       #
-      # Simultaneous, not staggered. Ownership of the comment is decided by
+      # Four, not more. With the lock their deliveries serialise, each holding it
+      # for RACE_WRITE_HOLD_MS plus two GitHub calls, and the last one to arrive
+      # has to outwait all the others inside the mutex's 20 second retry policy.
+      #
+      # Simultaneous, not staggered. Ownership between runs is decided by
       # runStartedAt, which the server assigns as each run is created. Any
-      # stagger makes the runs start in a known order AND makes their deliveries
+      # stagger makes the runs start in a known order and makes their deliveries
       # write in that same order, so the newest always writes last and
-      # canWriteOverComment simply answers correctly. Simulated over 2000 trials
-      # at this stack's ~50ms delivery jitter: a 200ms stagger never produces a
-      # wrong owner, 50ms produces one 4% of the time, and 0ms produces one 80%
-      # of the time. Launching together is what decouples runStartedAt order from
-      # write order.
+      # canWriteOverComment simply answers correctly.
       #
       # Which run should own the comment is therefore not known in advance — it
-      # is whichever the server stamped last. Read that from the five runs' start
-      # times in Currents, not from the b1..b5 suffix.
+      # is whichever the server stamped last. Read that from the four runs' start
+      # times in Currents, not from the b1..b4 suffix.
       #
       # Runs on one runner rather than matrix jobs so the launch is simultaneous.
       # Separate --output keeps them off each other's results, under the
@@ -125,7 +126,7 @@ jobs:
             exec npx pwc
           fi
 
-          RUNS=5
+          RUNS=4
           base="$CURRENTS_CI_BUILD_ID"
           pids=""
 

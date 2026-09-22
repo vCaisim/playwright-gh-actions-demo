@@ -1,22 +1,22 @@
 /**
- * Releases each group of the run in a tight staircase, so their comment
- * deliveries overlap without rendering the same board.
+ * Releases each group of the run three seconds after the last, so the run
+ * produces one distinct comment render per group.
  *
  * Currents raises RUN_FINISH per group, and @currents/playwright makes one group
- * per Playwright project, so the project count is what decides how many comment
- * updates a run produces. Spec files do not: there is no INSTANCE_FINISH in the
- * webhook processor.
+ * per Playwright project, so the project count decides how many comment updates
+ * a run produces. Spec files do not: there is no INSTANCE_FINISH in the webhook
+ * processor.
  *
  * The step has to clear the webhook pipeline. `reportWebhook` reads the run
  * document fresh when it processes an event and renders the board from that, so
- * two groups finishing inside one pipeline turnaround both render the run's
- * state as of the later one. The orchestrator hashes the body with the
- * ownership marker stripped, so those identical boards collapse into a single
- * delivery and there is nothing left to race.
+ * two groups finishing inside one pipeline turnaround both render the run as of
+ * the later one. The orchestrator hashes the body with the ownership marker
+ * stripped, so those identical boards collapse into a single delivery and there
+ * is nothing left to race. Three seconds is well past a local change-stream
+ * turnaround.
  *
- * Three seconds is well past a local change-stream turnaround. It does not need
- * to be small: the deliveries are reordered at delivery time by raceDelay.ts in
- * the currents repo, not by how far apart the groups finished.
+ * The step also sets how far apart the deliveries write, through INVERT_SCALE in
+ * raceDelay.ts. Changing it here changes that spacing too.
  */
 export async function finishInSequence(projectName: string, stepMs = 3000) {
   const barrierAt = Number(process.env.RACE_BARRIER_AT);
@@ -34,8 +34,8 @@ export async function finishInSequence(projectName: string, stepMs = 3000) {
   // The step is added to whatever is left of the barrier rather than to the
   // barrier itself. Orchestration can spend longer setting the run up than the
   // barrier allows for, and then the barrier is already in the past: taking the
-  // difference would give every group a non-positive wait, all eight would
-  // finish in the same instant, and the identical boards would collapse into one
+  // difference would give every group a non-positive wait, all four would finish
+  // in the same instant, and the identical boards would collapse into one
   // delivery. This way a stale barrier costs alignment, not the staircase.
   const untilBarrier = Math.max(0, barrierAt - Date.now());
   await new Promise((resolve) =>
