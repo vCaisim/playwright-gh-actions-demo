@@ -97,26 +97,30 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
-      # Scenario B starts RUNS runs at the same instant, with the same work, so
-      # they start together and finish together.
+      # Scenario B starts RUNS runs that are created at the same instant, with the
+      # same work, so they start together and finish together.
       #
-      # Four, not more. With the lock their deliveries serialise, each holding it
+      # Forking them together is not enough. Each `npx pwc` spends a second or
+      # more booting before it creates its run, and several booting at once on a
+      # two-core runner spread over seconds — at which point the last-created run
+      # claims the comment at its own RUN_START and every older run's finish
+      # delivery correctly skips. RACE_START_AT holds each process in
+      # currents.config.ts until one instant, just before it creates the run.
+      # Modelled over 5000 runs: the comment goes to the wrong run 82% of the time
+      # when the creations land together, 60% when they spread over 400ms, and 17%
+      # over 3s.
+      #
+      # Six, not more. With the lock their deliveries serialise, each holding it
       # for RACE_WRITE_HOLD_MS plus two GitHub calls, and the last one to arrive
       # has to outwait all the others inside the mutex's 20 second retry policy.
       #
-      # Simultaneous, not staggered. Ownership between runs is decided by
-      # runStartedAt, which the server assigns as each run is created. Any
-      # stagger makes the runs start in a known order and makes their deliveries
-      # write in that same order, so the newest always writes last and
-      # canWriteOverComment simply answers correctly.
+      # Which run should own the comment is not known in advance — it is
+      # whichever the server stamped last. Read that from the runs' start times in
+      # Currents, not from the b1..bN suffix.
       #
-      # Which run should own the comment is therefore not known in advance — it
-      # is whichever the server stamped last. Read that from the four runs' start
-      # times in Currents, not from the b1..b4 suffix.
-      #
-      # Runs on one runner rather than matrix jobs so the launch is simultaneous.
-      # Separate --output keeps them off each other's results, under the
-      # already-ignored test-results/.
+      # Runs on one runner rather than matrix jobs so they share the clock
+      # RACE_START_AT is expressed in. Separate --output keeps them off each
+      # other's results, under the already-ignored test-results/.
       - name: Run scenario ${{ needs.pick.outputs.scenario }}
         working-directory: ./${{ needs.pick.outputs.dir }}
         env:
@@ -126,9 +130,16 @@ jobs:
             exec npx pwc
           fi
 
-          RUNS=4
+          RUNS=6
           base="$CURRENTS_CI_BUILD_ID"
           pids=""
+
+          # Long enough for every `npx pwc` to boot and reach currents.config.ts.
+          # If one arrives late it creates its run late, and that run wins the
+          # comment on its own — the job log says how long each one waited.
+          RACE_START_AT=$(( $(date +%s%3N) + 25000 ))
+          export RACE_START_AT
+          echo "runs are created at $RACE_START_AT"
 
           for i in $(seq 1 "$RUNS"); do
             RUN_WORK_MS=3000 CURRENTS_CI_BUILD_ID="${base}-b${i}" \
