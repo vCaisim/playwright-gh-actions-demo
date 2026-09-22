@@ -41,7 +41,7 @@ four ways two writers meet on it:
 | collision                                           | ordered by                                                              | covered by                                                                |
 | --------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | edits of one run, one per group                     | `snapshotAt`                                                            | **A**                                                                     |
-| two runs on the same pull request                   | `runStartedAt`                                                          | **B**                                                                     |
+| several runs on the same pull request               | `runStartedAt`                                                          | **B**                                                                     |
 | a run's post and its own first edit                 | `RetriableError('Run comment not posted yet')`, which predates the lock | **C**, as a control                                                       |
 | a delivery and its own retry (BullMQ `attempts: 3`) | nothing — the retry re-reads the notification                           | no scenario: it writes the same render or a newer one, never an older one |
 
@@ -61,7 +61,7 @@ is set. Put them in `packages/change-streams/.env`:
 
 ```sh
 RACE_READ_AT_MS=45000     # scenarios A and C
-RACE_WRITE_HOLD_MS=4000   # scenario B
+RACE_WRITE_HOLD_MS=2000   # scenario B
 ```
 
 Set one at a time — with both, `RACE_READ_AT_MS` wins. Take them out again when
@@ -87,12 +87,12 @@ green.
 |       | what races          | compared by    | without the lock                             | with the lock                 |
 | ----- | ------------------- | -------------- | -------------------------------------------- | ----------------------------- |
 | **A** | 4 groups of one run | `snapshotAt`   | ends on an **earlier board**, always 4 edits | ends on **4 of 4**, 2–3 edits |
-| **B** | 4 runs, one comment | `runStartedAt` | **not** the last-started run, 2–6 runs in 10 | always the last-started run   |
+| **B** | 6 runs, one comment | `runStartedAt` | **not** the last-started run, ~8 runs in 10  | always the last-started run   |
 | **C** | nothing             | —              | one comment, final board                     | identical                     |
 
 A is the one to use: it lands on a stale render on effectively every run. B
-exercises the other comparison in `canWriteOverComment` but is a coin toss — see
-below.
+exercises the other comparison in `canWriteOverComment`, and hits about four
+times in five.
 
 ---
 
@@ -146,33 +146,47 @@ the lock it ends on group 4 in every configuration.
 Four groups and not more: with the lock the holds run one after another inside
 the mutex's 20 second retry policy, and eight would not fit.
 
-### B — four runs racing for one comment
+### B — six runs racing for one comment
 
-Four runs start at the same instant with the same work, so they finish together.
-`RACE_WRITE_HOLD_MS` holds every delivery between its read and its write, which
-is what puts all four reads ahead of all four writes.
+Six runs are **created** at the same instant with the same work, so they start
+together and finish together. Two things have to line up:
 
 ```
-run 1   read ──┤4s├── write
-run 2   read ──┤4s├── write     all four read before any of them writes
-run 3   read ──┤4s├── write
-run 4   read ──┤4s├── write
+RACE_START_AT      every pwc blocks in currents.config.ts until this instant,
+                   so the six runStartedAt land within milliseconds
+
+RACE_WRITE_HOLD_MS holds each delivery between its read and its write, so all
+                   six reads land ahead of all six writes
+
+run 1   read ──┤2s├── write
+run 2   read ──┤2s├── write
+run 3   read ──┤2s├── write     all six read before any of them writes
+run 4   read ──┤2s├── write
+run 5   read ──┤2s├── write
+run 6   read ──┤2s├── write
 ```
+
+The creation instant is what the scenario turns on. Forking six `npx pwc`
+together is not enough: each spends a second or more booting, and on a two-core
+runner they reach run creation seconds apart. A run created clearly last claims
+the comment at its own RUN_START, before any older run's finish delivery reads —
+and then every older one correctly skips, leaving nothing to see. The barrier in
+`currents.config.ts` is the last point before the run is created, so that is
+where they are brought together.
+
+Modelled over 5000 runs, without the lock:
+
+| runs created within          | comment goes to the wrong run |
+| ---------------------------- | ----------------------------- |
+| ~10ms (with `RACE_START_AT`) | **82%**                       |
+| 400ms                        | 60%                           |
+| 3s                           | 17%                           |
+
+**With the lock** it names the last-created run every time, at every spread.
 
 The run that should own the comment is whichever Currents stamped last — read the
-start times in Currents, not the `b1..b4` suffix. Four and not more, for the same
-reason scenario A uses four groups.
-
-**Without the lock** which write lands last is chance, and the rate depends
-almost entirely on how tightly the four `npx pwc` processes get their runs
-created. Modelled over 5000 runs: about 6 in 10 when the four starts fall within
-400ms of each other, 3 in 10 at 1.5s apart, under 2 in 10 at 3s apart. A run that
-starts clearly last claims the comment at its own RUN_START, before the others'
-finish deliveries read. Check the four start times in Currents, and run it
-several times.
-**With the lock** it names the last-started run every time, at every spread.
-
-It cannot be made deterministic here: the runs share no clock to hold to.
+start times in Currents, not the `b1..b6` suffix. Six and not more: with the lock
+the holds serialise inside the mutex's 20 second retry policy.
 
 ### C — one run, one group
 

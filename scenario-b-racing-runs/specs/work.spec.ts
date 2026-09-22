@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * The workflow starts four runs of this config at the same instant under
- * different ci-build-ids, so they are four separate runs racing for one comment.
+ * The workflow starts six runs of this config under different ci-build-ids, all
+ * blocking in currents.config.ts until one instant, so they are six separate runs
+ * created together and racing for one comment.
  *
- * Starting together is the point. Ownership between runs is decided by
+ * Being created together is the point. Ownership between runs is decided by
  * `runStartedAt`, which the server assigns as each run is created, and any
  * stagger makes the runs start in a known order and their deliveries write in
  * that same order — so the newest writes last and `canWriteOverComment` simply

@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 
 /**
  * One spec, one worker. Nothing inside a single run of this config overlaps with
- * anything: the scenario comes from the workflow launching four runs of it at
+ * anything: the scenario comes from the workflow launching six runs of it at
  * once under different ci-build-ids.
  */
 export default defineConfig<CurrentsFixtures, CurrentsWorkerFixtures>({
