@@ -38,6 +38,14 @@ const config = defineConfig<CurrentsFixtures, CurrentsWorkerFixtures>({
         ...devices["Desktop Chrome"],
       },
     },
+    {
+      name: "Project C",
+      retries: 0,
+      testMatch: /.*failing.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
   ],
 
   webServer: {

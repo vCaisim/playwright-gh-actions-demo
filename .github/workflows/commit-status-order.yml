@@ -1,0 +1,48 @@
+name: commit-status-order
+
+# ENG-1356: a RUN_START `pending` delivered after the group's RUN_FINISH must not
+# overwrite it. See commit-status/README.md.
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  commit-status:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    env:
+      CURRENTS_CI_BUILD_ID: status-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - run: npm ci
+
+      # Only append to GITHUB_ENV when non-empty (empty CURRENTS_API_URL would break ?? fallbacks in Node).
+      - name: Optional Currents API URL and record key
+        env:
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
+          CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
+        run: |
+          if [ -n "$CURRENTS_API_URL_INPUT" ]; then
+            echo "CURRENTS_API_URL=$CURRENTS_API_URL_INPUT" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$CURRENTS_RECORD_KEY_INPUT" ]; then
+            {
+              echo "CURRENTS_RECORD_KEY<<CURR_EOF"
+              printf '%s\n' "$CURRENTS_RECORD_KEY_INPUT"
+              echo "CURR_EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
+      # The failing group is intended; the job result does not matter here, only
+      # the commit statuses Currents posts.
+      - name: Playwright Tests
+        working-directory: ./commit-status
+        run: npx playwright test --config playwright.config.ts || true
