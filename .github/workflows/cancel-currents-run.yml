@@ -25,7 +25,9 @@ jobs:
       cancel-in-progress: true
     timeout-minutes: 20
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.58.2-jammy
+    # Matches the lockfile on main (@playwright/test 1.49.0); the newer test/*
+    # branches upgraded to 1.58.2 and use that image.
+    container: mcr.microsoft.com/playwright:v1.49.0-jammy
     env:
       # The reporter and the cancel step have to name the same run, and
       # `currents cancel` does not derive an id the way the reporter does.
