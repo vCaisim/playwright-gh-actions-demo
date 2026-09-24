@@ -1,0 +1,95 @@
+name: cancel-currents-run
+
+# Two identical jobs report the same tests to Currents; only `with-cancel` has
+# the cancel step. Cancel the workflow (or push again, which supersedes it
+# through `concurrency`) while basic/9-slow.spec.ts is running, then compare
+# the two runs in Currents: `cancel-demo-with-*` should be cancelled and
+# `cancel-demo-without-*` should stay in progress until the project's
+# inactivity timeout.
+on:
+  push:
+    branches: [test/cancel-currents-run]
+  workflow_dispatch:
+    inputs:
+      slow_seconds:
+        description: How long basic/9-slow.spec.ts waits, in seconds
+        default: "180"
+
+jobs:
+  with-cancel:
+    name: with cancel step (${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    concurrency:
+      group: with-cancel-${{ github.ref }}-${{ matrix.shard }}
+      cancel-in-progress: true
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.49.0-noble
+    env:
+      CURRENTS_PROJECT_ID: bnsqNa
+      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+      # The reporter and the cancel step have to name the same run, and
+      # `currents cancel` does not derive an id the way the reporter does.
+      CURRENTS_CI_BUILD_ID: cancel-demo-with-${{ github.run_id }}-${{ github.run_attempt }}
+      SLOW_SECONDS: ${{ inputs.slow_seconds || '180' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chrome
+
+      - name: Playwright tests
+        working-directory: ./basic
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --config ./playwright.config.reporter.ts
+
+      - name: Cancel the Currents run
+        if: ${{ cancelled() }}
+        run: npx -y @currents/cmd@1.10.0 cancel
+
+  without-cancel:
+    name: without cancel step (${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    concurrency:
+      group: without-cancel-${{ github.ref }}-${{ matrix.shard }}
+      cancel-in-progress: true
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.49.0-noble
+    env:
+      CURRENTS_PROJECT_ID: bnsqNa
+      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+      CURRENTS_CI_BUILD_ID: cancel-demo-without-${{ github.run_id }}-${{ github.run_attempt }}
+      SLOW_SECONDS: ${{ inputs.slow_seconds || '180' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chrome
+
+      - name: Playwright tests
+        working-directory: ./basic
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --config ./playwright.config.reporter.ts
