@@ -1,7 +1,8 @@
 name: failed-only-or8n
 
 on:
-  push:
+  workflow_dispatch:
+  # push:
 
 jobs:
   test-or8n:
