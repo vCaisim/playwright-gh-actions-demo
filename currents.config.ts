@@ -1,8 +1,8 @@
 import { CurrentsConfig } from "@currents/playwright";
 
 const config: CurrentsConfig = {
-  projectId: "mdXsz8",
-  recordKey: "KPEvZL0LDYzcZH3U",
+  projectId: process.env.CURRENTS_PROJECT_ID || "mdXsz8",
+  recordKey: process.env.CURRENTS_RECORD_KEY || "KPEvZL0LDYzcZH3U",
   ciBuildId: Date.now().toString(),
   orchestration: {
     skipReporterInjection: true,
