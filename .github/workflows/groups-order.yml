@@ -1,40 +1,32 @@
-name: failed-only-shards
+name: groups-order
 
+# Reproduces a run comment whose failed group joined after the 10th group: one
+# job, 12 Playwright projects (Currents groups), no browsers.
 on:
-  workflow_dispatch:
+  pull_request:
 
 jobs:
-  test-shards:
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    timeout-minutes: 60
+  test:
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.58.2-jammy
+    timeout-minutes: 10
     env:
-      CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_CI_BUILD_ID: groups-order-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
       CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      # https://github.com/actions/runner-images/issues/6775
-      - run: |
-          echo "$GITHUB_WORKSPACE"
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@v4
         with:
           node-version: "20.x"
+          cache: npm
 
+      # The tests don't open a page, so no browser install.
       - name: Install dependencies
-        run: |
-          npm ci
-          npx playwright install chrome
+        run: npm ci
 
       # Only append to GITHUB_ENV when non-empty (empty CURRENTS_API_URL would break ?? fallbacks in Node).
-      # API URL may be a repo/org variable or a secret (secrets are common for self-hosted / staging URLs).
       - name: Optional Currents API URL and record key
         env:
           CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
@@ -51,19 +43,5 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
-      - name: Playwright Last Failed action
-        id: last-failed-action
-        uses: currents-dev/playwright-last-failed@v1
-        with:
-          # debug: true
-          pw-output-dir: basic/test-results
-          matrix-index: ${{ matrix.shard }}
-          matrix-total: ${{ strategy.job-total }}
-
       - name: Playwright Tests
-        working-directory: ./basic
-        run: |
-          COMMAND="npx pwc ${{ steps.last-failed-action.outputs.extra-pw-flags }}"
-          echo "Running command: $COMMAND"
-          $COMMAND
-
+        run: npx playwright test --config groups-order/playwright.config.ts
