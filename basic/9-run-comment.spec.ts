@@ -63,3 +63,83 @@ test.describe("pricing", () => {
     expect(discounted).toBe(16.98);
   });
 });
+
+test.describe("todos, more", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("https://demo.playwright.dev/todomvc");
+    const input = page.locator("input.new-todo");
+    for (const todo of ["Buy milk", "Walk the dog"]) {
+      await input.fill(todo);
+      await input.press("Enter");
+    }
+  });
+
+  test("renames a todo", async ({ page }) => {
+    await page.getByTestId("todo-title").first().dblclick();
+    await page
+      .getByTestId("text-input")
+      .last()
+      .fill("Buy oat milk", { timeout: 2000 });
+    await page.getByTestId("text-input").last().press("Enter");
+    await expect(page.getByTestId("todo-title").first()).toHaveText(
+      "Buy almond milk",
+      { timeout: 2000 },
+    );
+  });
+
+  test("marks every todo as complete", async ({ page }) => {
+    await page.getByLabel("Mark all as complete").check();
+    await expect(page.getByTestId("todo-count")).toHaveText("1 item left", {
+      timeout: 2000,
+    });
+  });
+
+  test("shows only the active todos", async ({ page }) => {
+    await page.locator(".todo-list li .toggle").first().check();
+    await page.getByRole("link", { name: "Active" }).click();
+    await expect(page.getByTestId("todo-item")).toHaveCount(3, {
+      timeout: 2000,
+    });
+  });
+});
+
+test.describe("user profile, more", () => {
+  test("shows the user's email", async ({ page }) => {
+    await page.goto("/network.html");
+    await page.click("text=Load user");
+    await expect(page.locator("#user-email")).toBeVisible({ timeout: 2000 });
+  });
+
+  test("shows an error when the user cannot be loaded", async ({ page }) => {
+    await page.route("/api/v1/users.json", (route) =>
+      route.fulfill({ status: 500, body: "Internal Server Error" }),
+    );
+    await page.goto("/network.html");
+    await page.click("text=Load user");
+    await expect(page.getByText("Could not load the user")).toBeVisible({
+      timeout: 2000,
+    });
+  });
+});
+
+test.describe("users API, more", () => {
+  test("lists the users", async ({ request }) => {
+    const response = await request.get("/api/v1/users");
+    expect(response.status()).toBe(200);
+  });
+});
+
+test.describe("pricing, more", () => {
+  test("adds tax to the total", () => {
+    const total = 100 * 1.2;
+    expect(total).toBe(119);
+  });
+
+  test("formats a price in euros", () => {
+    const price = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "EUR",
+    }).format(19.99);
+    expect(price).toBe("19,99 €");
+  });
+});
