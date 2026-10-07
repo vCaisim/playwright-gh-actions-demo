@@ -1,8 +1,8 @@
 name: run-comment
 
-# Reproduces tests that time out with no step recording an error, for the "Last
-# Steps" section of the run-level AI context, and posts a run comment with the
-# small footer. One job, one project, about 10 seconds of tests.
+# A run like a real suite's, for the run comment: failures with and without a
+# browser, an API test, a flaky test, one failing on one project only, and one
+# retry. See basic/playwright.config.run-comment.ts.
 on:
   pull_request:
 
@@ -47,4 +47,4 @@ jobs:
           fi
 
       - name: Playwright Tests
-        run: npx playwright test --config run-comment/playwright.config.ts
+        run: npx playwright test --config basic/playwright.config.run-comment.ts
