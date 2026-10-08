@@ -8,6 +8,7 @@ export default defineConfig({
   ...shared,
   retries: 1,
   workers: 2,
+  globalTeardown: "./run-comment.teardown.ts",
   reporter: [["list"], ["@currents/playwright"]],
   testMatch: [
     "0-failing.spec.ts",
