@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import shared from "./pw.config.shared";
 
 // A run like a real suite's, for the run comment: failures with a browser and
-// without one, an API test, a flaky test, and a test that fails on one
+// without one, an API test, flaky tests, and a test that fails on one
 // project only. One retry, so a failure shows "attempt 2 of 2".
 export default defineConfig({
   ...shared,
@@ -16,6 +16,7 @@ export default defineConfig({
     "5-flaky.spec.ts",
     "6-networking.spec.ts",
     "9-run-comment.spec.ts",
+    "9-run-comment-flaky.spec.ts",
   ],
   use: {
     ...shared.use,
