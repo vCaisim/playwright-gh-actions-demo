@@ -1,0 +1,44 @@
+name: post-when
+
+# One small run per push, whose outcome comes from post-when/OUTCOME, to check
+# which runs get a GitHub PR comment under each prCommentMode.
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CURRENTS_CI_BUILD_ID: post-when-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Currents API URL and record key
+        env:
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL }}
+          CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
+        run: |
+          echo "CURRENTS_API_URL=$CURRENTS_API_URL_INPUT" >> "$GITHUB_ENV"
+          {
+            echo "CURRENTS_RECORD_KEY<<CURR_EOF"
+            printf '%s\n' "$CURRENTS_RECORD_KEY_INPUT"
+            echo "CURR_EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Playwright Tests
+        run: npx playwright test --config post-when/playwright.config.ts
