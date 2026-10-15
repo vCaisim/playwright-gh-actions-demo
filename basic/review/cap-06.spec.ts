@@ -5,5 +5,5 @@ import { test } from "../base.ts";
 // with the most failures get review comments.
 test("cap case 06", async ({}, testInfo) => {
   if (testInfo.project.name !== "desktop") return;
-  expect(06).toBe(0);
+  expect(6).toBe(0);
 });
