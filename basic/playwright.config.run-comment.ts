@@ -29,5 +29,12 @@ export default defineConfig({
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile", use: { ...devices["Pixel 5"] } },
+    // Three more groups for review/many-groups.spec.ts only, so a failure
+    // lists five groups.
+    ...["tablet", "laptop", "kiosk"].map((name) => ({
+      name,
+      testMatch: "review/many-groups.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+    })),
   ],
 });
