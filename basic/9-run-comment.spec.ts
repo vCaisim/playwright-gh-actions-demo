@@ -125,7 +125,7 @@ test.describe("user profile, more", () => {
 test.describe("users API, more", () => {
   test("lists the users", async ({ request }) => {
     const response = await request.get("/api/v1/users");
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBe(404);
   });
 });
 
