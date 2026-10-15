@@ -18,6 +18,7 @@ export default defineConfig({
     "6-networking.spec.ts",
     "9-run-comment.spec.ts",
     "9-run-comment-flaky.spec.ts",
+    "review/*.spec.ts",
   ],
   use: {
     ...shared.use,
