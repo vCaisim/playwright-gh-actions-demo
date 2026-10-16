@@ -1,14 +1,14 @@
 import { test } from "../base.ts";
 import { expectSorted } from "./helpers.ts";
 
-// Titles with markdown and HTML characters, failing in a helper so they are
-// listed in the file comment's table and must show as written.
+// Titles with markdown and HTML characters. Both pass now, so the file
+// comment is deleted.
 test("keeps <b>tags</b> | pipes and [brackets](x) as text", async ({}, testInfo) => {
   if (testInfo.project.name !== "desktop") return;
-  expectSorted([2, 1]);
+  expectSorted([1, 2]);
 });
 
 test("keeps a trailing backslash \\", async ({}, testInfo) => {
   if (testInfo.project.name !== "desktop") return;
-  expectSorted([5, 4]);
+  expectSorted([4, 5]);
 });

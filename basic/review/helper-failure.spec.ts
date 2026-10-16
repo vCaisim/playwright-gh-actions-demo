@@ -2,11 +2,11 @@ import { expect } from "@playwright/test";
 import { test } from "../base.ts";
 import { expectSorted } from "./helpers.ts";
 
-// Fails inside a helper, so the error line is not in this spec: the file
-// comment lists it.
+// Passes now, so the spec's only failure has a line comment and the file
+// comment is deleted.
 test("sorts the prices", async ({}, testInfo) => {
   if (testInfo.project.name !== "desktop") return;
-  expectSorted([3, 1, 2]);
+  expectSorted([1, 2, 3]);
 });
 
 // Fails on a line of this spec, so it gets a line comment and the file comment
