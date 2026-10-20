@@ -1,0 +1,8 @@
+{
+  "name": "whole-run-status",
+  "private": true,
+  "devDependencies": {
+    "@currents/playwright": "2.5.2",
+    "@playwright/test": "1.64.1"
+  }
+}
