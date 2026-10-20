@@ -1,0 +1,11 @@
+{
+  "name": "cypress-e2e",
+  "private": true,
+  "scripts": {
+    "test": "cypress-cloud run --record --parallel"
+  },
+  "devDependencies": {
+    "cypress": "12.17.4",
+    "cypress-cloud": "1.13.1"
+  }
+}
