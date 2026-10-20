@@ -15,7 +15,9 @@ jobs:
         browser: [chrome, electron]
         machine: [1, 2]
     runs-on: ubuntu-latest
-    container: cypress/browsers:node-20.18.0-chrome-130.0.6723.69-1-ff-131.0.3-edge-130.0.2849.52-1
+    # Cypress's own binary stops runs that use cypress-cloud; this image has
+    # the binary Currents hosts for Cypress 12.
+    container: currentsdev/cypress-included:12.17.4
     env:
       CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID }}
       CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
@@ -32,6 +34,8 @@ jobs:
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - run: npm ci
+        env:
+          CYPRESS_INSTALL_BINARY: "0"
 
       - name: Cypress tests
         run: >
