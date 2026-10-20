@@ -1,0 +1,43 @@
+name: whole-run-status
+
+# Three jobs record three groups of the same Currents run (shared
+# CURRENTS_CI_BUILD_ID): "fast" passes at once, "slow" starts at once and
+# fails after 3 minutes, "late" waits 60 s before it starts and passes.
+on:
+  pull_request:
+
+env:
+  CURRENTS_CI_BUILD_ID: whole-run-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+  CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID }}
+  CURRENTS_API_URL: ${{ vars.CURRENTS_API_URL }}
+  CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [fast, slow, late]
+    name: ${{ matrix.group }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: whole-run
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - run: npm ci
+
+      - name: Wait before starting
+        if: matrix.group == 'late'
+        run: sleep 60
+
+      - name: Playwright Tests
+        run: npx playwright test --project ${{ matrix.group }}
