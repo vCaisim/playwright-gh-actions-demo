@@ -1,0 +1,49 @@
+name: cypress-upload-run-comment
+
+# Runs when the PR gets the label, so the two Cypress workflows don't edit
+# the same run comment at once.
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  cypress:
+    if: github.event.label.name == 'e2e:cypress-upload'
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [1, 2]
+    runs-on: ubuntu-latest
+    container: cypress/included:16.2.0
+    defaults:
+      run:
+        working-directory: ./cypress-e2e
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # No CURRENTS_* variables in this step: Cypress refuses to start when it
+      # sees them.
+      - name: Cypress tests
+        env:
+          MACHINE_INDEX: ${{ matrix.machine }}
+        run: >
+          cypress run
+          --config-file cypress.upload.config.js
+          --spec "$(ls cypress/e2e/*.cy.js | awk 'NR % 2 == ${{ matrix.machine }} - 1' | paste -sd, -)"
+
+      - name: Upload results to Currents
+        if: ${{ !cancelled() }}
+        env:
+          CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID }}
+          CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+          CURRENTS_API_URL: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
+          CURRENTS_CI_BUILD_ID: ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: >
+          npx -y @currents/cmd@2.3.0 run upload
+          --input-format cypress-json
+          --input-file "results/cypress-results-*.json"

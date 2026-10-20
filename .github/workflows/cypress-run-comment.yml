@@ -1,0 +1,43 @@
+name: cypress-run-comment
+
+# Runs when the PR gets the label, so the two Cypress workflows don't edit
+# the same run comment at once.
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  cypress:
+    if: github.event.label.name == 'e2e:cypress-cloud'
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, electron]
+        machine: [1, 2]
+    runs-on: ubuntu-latest
+    container: cypress/browsers:node-20.18.0-chrome-130.0.6723.69-1-ff-131.0.3-edge-130.0.2849.52-1
+    env:
+      CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID }}
+      CURRENTS_RECORD_KEY: ${{ secrets.CURRENTS_RECORD_KEY }}
+      CURRENTS_API_URL: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
+    defaults:
+      run:
+        working-directory: ./cypress-e2e
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # https://github.com/actions/runner-images/issues/6775
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - run: npm ci
+
+      - name: Cypress tests
+        run: >
+          npx cypress-cloud run
+          --record
+          --parallel
+          --browser ${{ matrix.browser }}
+          --group ${{ matrix.browser }}
+          --ci-build-id ${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
