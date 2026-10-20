@@ -1,5 +1,4 @@
 node_modules
 cypress/screenshots
 cypress/videos
-results
 !package-lock.json

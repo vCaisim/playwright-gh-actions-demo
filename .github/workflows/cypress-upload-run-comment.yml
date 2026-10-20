@@ -17,7 +17,7 @@ jobs:
     container: cypress/included:16.2.0
     defaults:
       run:
-        working-directory: ./cypress-e2e
+        working-directory: ./cypress-e2e-upload
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +33,6 @@ jobs:
           MACHINE_INDEX: ${{ matrix.machine }}
         run: >
           cypress run
-          --config-file cypress.upload.config.js
           --spec "$(ls cypress/e2e/*.cy.js | awk 'NR % 2 == ${{ matrix.machine }} - 1' | paste -sd, -)"
 
       - name: Upload results to Currents

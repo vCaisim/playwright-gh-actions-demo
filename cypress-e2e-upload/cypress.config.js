@@ -1,5 +1,7 @@
-// Cypress 13+ config: no cypress-cloud. `currents run upload` reads the file
-// written in `after:run`, and the screenshots and videos next to it.
+// Cypress 13+ refuses to run in a folder that has cypress-cloud or its
+// config, so this project is separate from ../cypress-e2e. `currents run
+// upload` reads the file written in `after:run`, and the screenshots and
+// videos next to it.
 const fs = require("fs");
 
 module.exports = {
