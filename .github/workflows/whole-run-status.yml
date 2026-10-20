@@ -2,7 +2,7 @@ name: whole-run-status
 
 # Three jobs record three groups of the same Currents run (shared
 # CURRENTS_CI_BUILD_ID): "fast" passes at once, "slow" starts at once and
-# fails after 3 minutes, "late" waits 60 s before it starts and passes.
+# passes after 90 s, "late" waits 60 s before it starts and passes.
 on:
   pull_request:
 
