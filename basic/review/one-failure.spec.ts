@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../base.ts";
+import { expectSorted } from "./helpers.ts";
 
 // Shifted down three lines by a force push, so the line comment is
 // deleted and posted again on the new line.
@@ -15,4 +16,11 @@ test("rounds the total to two decimals", async ({}, testInfo) => {
   // outdated and it is posted again on the new line.
   const expected = 0.31;
   expect(total, "order total in euros").toBeCloseTo(expected, 5);
+});
+
+// Fails inside the shared helper, so its error line is not in this spec: it
+// gets no line comment of its own, and the spec's line comment counts it.
+test("lists the cart items in price order", async ({}, testInfo) => {
+  if (testInfo.project.name !== "desktop") return;
+  expectSorted([3, 1, 2]);
 });
