@@ -4,7 +4,7 @@ import { test } from "./base.ts";
 test("basic test @basic", async ({ page }) => {
   await page.goto("https://demo.playwright.dev/todomvc");
 
-  // Use locators to represent a selector and re-use them
+  // Locators represent a selector and can be re-used
   const inputBox = page.locator("input.new-todo");
   const todoList = page.locator(".todo-list");
 
