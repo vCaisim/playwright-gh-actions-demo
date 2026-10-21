@@ -1,11 +1,12 @@
 import { expect } from "@playwright/test";
 import { test } from "../base.ts";
 
-// A `Received string:` line over 500 characters, then `Timeout:`: the error
-// summary keeps the `Timeout:` line after the long one.
+// A `Received:` line over 500 characters, then `Timeout:`: the error summary
+// keeps the `Timeout:` line after the long one. Kept to 600 characters so the
+// whole message stays under the reporter's 2048-character cut.
 test("shows the full order notes", async ({ page }, testInfo) => {
   if (testInfo.project.name !== "desktop") return;
-  await page.setContent(`<main>${"Leave the parcel at the door. ".repeat(30)}</main>`);
+  await page.setContent(`<main>${"Leave the parcel at the door. ".repeat(20)}</main>`);
   await expect(page.locator("main")).toHaveText("Leave the parcel", { timeout: 1000 });
 });
 
