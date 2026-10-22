@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
 
       # Only append to GITHUB_ENV when non-empty (empty CURRENTS_API_URL would break ?? fallbacks in Node).
       - name: Optional Currents API URL and record key
@@ -47,4 +47,4 @@ jobs:
           fi
 
       - name: Playwright Tests
-        run: npx playwright test --config basic/playwright.config.run-comment.ts
+        run: npx playwright test --config basic/playwright.config.group-errors.ts
