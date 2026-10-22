@@ -11,9 +11,11 @@ test("opens the saved cart", async ({ page, browserName }) => {
   await expect(page.locator("#count")).toHaveText("2", { timeout: 1000 });
 });
 
-// Hidden by a media query on the phone, wrong text everywhere else.
+// Hidden by a media query on the phone, wrong text everywhere else. Without
+// the viewport meta tag the phone lays the page out 980px wide.
 test("shows the account menu", async ({ page }) => {
   await page.setContent(`
+    <meta name="viewport" content="width=device-width">
     <style>@media (max-width: 600px) { #menu { display: none; } }</style>
     <nav id="menu">Sign in</nav>`);
   await expect(page.locator("#menu")).toBeVisible({ timeout: 1000 });
