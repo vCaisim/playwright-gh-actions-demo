@@ -1,0 +1,50 @@
+name: run-comment
+
+# A run like a real suite's, for the run comment: failures with and without a
+# browser, an API test, a flaky test, one failing on one project only, and one
+# retry. See basic/playwright.config.run-comment.ts.
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CURRENTS_CI_BUILD_ID: run-comment-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      CURRENTS_PROJECT_ID: ${{ vars.CURRENTS_PROJECT_ID != '' && secrets.CURRENTS_RECORD_KEY != '' && vars.CURRENTS_PROJECT_ID || 'mdXsz8' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      # Only append to GITHUB_ENV when non-empty (empty CURRENTS_API_URL would break ?? fallbacks in Node).
+      - name: Optional Currents API URL and record key
+        env:
+          CURRENTS_API_URL_INPUT: ${{ vars.CURRENTS_API_URL || secrets.CURRENTS_API_URL }}
+          CURRENTS_RECORD_KEY_INPUT: ${{ secrets.CURRENTS_RECORD_KEY }}
+        run: |
+          if [ -n "$CURRENTS_API_URL_INPUT" ]; then
+            echo "CURRENTS_API_URL=$CURRENTS_API_URL_INPUT" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$CURRENTS_RECORD_KEY_INPUT" ]; then
+            {
+              echo "CURRENTS_RECORD_KEY<<CURR_EOF"
+              printf '%s\n' "$CURRENTS_RECORD_KEY_INPUT"
+              echo "CURR_EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Playwright Tests
+        run: npx playwright test --config basic/playwright.config.group-errors.ts
